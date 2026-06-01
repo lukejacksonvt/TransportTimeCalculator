@@ -230,6 +230,7 @@ async function computeRoute(origin, waypoints, destination) {
       destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
       intermediates: waypoints.map(wp => ({ location: { latLng: { latitude: wp.lat, longitude: wp.lng } } })),
       travelMode: "DRIVE",
+      departureTime: new Date().toISOString(),
     }),
   });
   if (!res.ok) return null;
@@ -371,6 +372,7 @@ export default function App() {
   const [locating, setLocating] = useState(false);
   const [bedsideMin, setBedsideMin] = useState(40);
   const [weatherLayer, setWeatherLayer] = useState("precip");
+  const [showTraffic, setShowTraffic] = useState(false);
   const [hospitalWeather, setHospitalWeather] = useState({});
 
   const fixedBase = BASES.find(b => b.id === baseId);
@@ -406,6 +408,7 @@ export default function App() {
   const markersRef = useRef([]);
   const polylineRef = useRef(null);
   const weatherLayerRef = useRef(null);
+  const trafficLayerRef = useRef(null);
   const tempLabelsRef = useRef([]);
 
   useEffect(() => {
@@ -521,6 +524,14 @@ export default function App() {
     }
     map.overlayMapTypes.push(weatherLayerRef.current);
   }, [weatherLayer, mapReady]);
+
+  // Traffic layer
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google) return;
+    if (!trafficLayerRef.current)
+      trafficLayerRef.current = new window.google.maps.TrafficLayer();
+    trafficLayerRef.current.setMap(showTraffic ? mapInstanceRef.current : null);
+  }, [showTraffic, mapReady]);
 
   // Temperature labels on map
   useEffect(() => {
@@ -1062,14 +1073,21 @@ export default function App() {
         body[data-theme="dark"] .temp-label.sending   { border-color: #d4a820; color: #d4a820; background: rgba(26,20,0,0.92); }
         body[data-theme="dark"] .temp-label.receiving { border-color: #1e7a48; color: #1e9a58; background: rgba(0,24,16,0.92); }
 
-        /* WEATHER LAYER CONTROLS */
+        /* MAP LAYER CONTROLS */
         .map-wrap { position: relative; margin-top: 16px; }
-        .weather-controls {
+        .map-controls {
           position: absolute;
           top: 8px; right: 8px;
           z-index: 10;
           display: flex;
+          gap: 4px;
+          align-items: center;
         }
+        .weather-controls {
+          display: flex;
+        }
+        .traffic-toggle { border-radius: 2px !important; }
+        .traffic-toggle.active.traffic { background: rgba(255,245,235,0.96); border-color: #c06020; color: #c06020; }
         .weather-btn {
           background: rgba(255,255,255,0.92);
           border: 1px solid #cddbe8;
@@ -1339,14 +1357,20 @@ export default function App() {
               style={{ borderRadius: 4, overflow: "hidden", height: 320,
                 border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
             />
-            <div className="weather-controls">
-              {[["", "Off"], ["precip", "Precip"]].map(([val, label]) => (
-                <button
-                  key={val}
-                  className={`weather-btn${weatherLayer === val ? " active" : ""}`}
-                  onClick={() => setWeatherLayer(val)}
-                >{label}</button>
-              ))}
+            <div className="map-controls">
+              <div className="weather-controls">
+                {[["", "Off"], ["precip", "Precip"]].map(([val, label]) => (
+                  <button
+                    key={val}
+                    className={`weather-btn${weatherLayer === val ? " active" : ""}`}
+                    onClick={() => setWeatherLayer(val)}
+                  >{label}</button>
+                ))}
+              </div>
+              <button
+                className={`weather-btn traffic-toggle${showTraffic ? " active traffic" : ""}`}
+                onClick={() => setShowTraffic(t => !t)}
+              >Traffic</button>
             </div>
           </div>
         )}
