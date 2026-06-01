@@ -346,6 +346,7 @@ export default function App() {
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
   const [bedsideMin, setBedsideMin] = useState(40);
+  const [showWeather, setShowWeather] = useState(false);
 
   const fixedBase = BASES.find(b => b.id === baseId);
   const base = baseId === "current"
@@ -379,6 +380,7 @@ export default function App() {
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const polylineRef = useRef(null);
+  const weatherLayerRef = useRef(null);
 
   useEffect(() => {
     document.body.dataset.theme = isDark ? "dark" : "light";
@@ -450,6 +452,26 @@ export default function App() {
     if (!mapInstanceRef.current) return;
     mapInstanceRef.current.setOptions({ styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT });
   }, [isDark]);
+
+  // Weather tile overlay toggle
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google) return;
+    const map = mapInstanceRef.current;
+    if (showWeather) {
+      if (!weatherLayerRef.current) {
+        weatherLayerRef.current = new window.google.maps.ImageMapType({
+          getTileUrl: (coord, zoom) =>
+            `https://weather.googleapis.com/v1/mapTypes/US_PRECIPITATION_CURRENT/mapTiles/${zoom}/${coord.x}/${coord.y}?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}`,
+          tileSize: new window.google.maps.Size(256, 256),
+          opacity: 0.65,
+          name: "Weather",
+        });
+      }
+      map.overlayMapTypes.push(weatherLayerRef.current);
+    } else {
+      map.overlayMapTypes.clear();
+    }
+  }, [showWeather, isLoaded]);
 
   // Update markers, polyline, and fitBounds when route changes
   useEffect(() => {
@@ -956,6 +978,29 @@ export default function App() {
         body[data-theme="dark"] .hsel-city { color: #2e5a72; }
         body[data-theme="dark"] .hsel-option.active .hsel-city { color: #a07820; }
 
+        /* WEATHER TOGGLE */
+        .map-wrap { position: relative; margin-top: 16px; }
+        .weather-toggle {
+          position: absolute;
+          top: 8px; right: 8px;
+          z-index: 10;
+          background: rgba(255,255,255,0.92);
+          border: 1px solid #cddbe8;
+          border-radius: 2px;
+          padding: 5px 10px;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 9px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: #4a6a8a;
+          cursor: pointer;
+          transition: all 0.18s;
+        }
+        .weather-toggle:hover { border-color: #1a7040; color: #1a7040; }
+        .weather-toggle.active { background: rgba(240,253,244,0.95); border-color: #1a7040; color: #1a7040; }
+        body[data-theme="dark"] .weather-toggle { background: rgba(11,21,32,0.92); border-color: #152434; color: #5a8a9a; }
+        body[data-theme="dark"] .weather-toggle.active { background: rgba(0,24,16,0.92); border-color: #1e7a48; color: #1e9a58; }
+
         /* THEME TRANSITIONS */
         body, .card, select, .mode-btn, .total-box, .leg-dot, .bedside-dot {
           transition: background 0.4s, color 0.4s, border-color 0.4s;
@@ -1198,11 +1243,19 @@ export default function App() {
         </div>
 
         {isLoaded && result && (
-          <div
-            ref={mapDivRef}
-            style={{ marginTop: 16, borderRadius: 4, overflow: "hidden", height: 320,
-              border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
-          />
+          <div className="map-wrap">
+            <div
+              ref={mapDivRef}
+              style={{ borderRadius: 4, overflow: "hidden", height: 320,
+                border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
+            />
+            <button
+              className={`weather-toggle${showWeather ? " active" : ""}`}
+              onClick={() => setShowWeather(w => !w)}
+            >
+              {showWeather ? "◉ Precip On" : "○ Precip"}
+            </button>
+          </div>
         )}
       </div>
     </>
