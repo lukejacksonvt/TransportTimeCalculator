@@ -179,6 +179,34 @@ function formatTime(mins) {
 // Parse Routes API duration string e.g. "3600s" → 3600
 const parseSecs = s => parseInt(s) || 0;
 
+const BASE_SHIFTS = {
+  sanford:       [{ start: 800,  end: 2000 }, { start: 2000, end: 800  }],
+  cmmc_base:     [{ start: 1000, end: 2200 }],
+  rodman:        [{ start: 1000, end: 2200 }],
+  emmc_base:     [{ start: 1900, end: 700  }, { start: 700,  end: 1900 }],
+  bangor_hangar: [{ start: 1900, end: 700  }, { start: 700,  end: 1900 }],
+};
+
+function getActiveShift(baseId, now) {
+  const shifts = BASE_SHIFTS[baseId];
+  if (!shifts) return null;
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  for (const { start, end } of shifts) {
+    const startMins = Math.floor(start / 100) * 60 + (start % 100);
+    const endMins   = Math.floor(end   / 100) * 60 + (end   % 100);
+    const inShift   = endMins > startMins
+      ? nowMins >= startMins && nowMins < endMins
+      : nowMins >= startMins || nowMins < endMins;
+    if (!inShift) continue;
+    const shiftEnd = new Date(now);
+    shiftEnd.setHours(Math.floor(end / 100), end % 100, 0, 0);
+    if (endMins <= startMins && nowMins >= startMins) shiftEnd.setDate(shiftEnd.getDate() + 1);
+    const fmt = n => `${String(Math.floor(n / 100)).padStart(2, "0")}${String(n % 100).padStart(2, "0")}`;
+    return { label: `${fmt(start)}–${fmt(end)}`, end: shiftEnd };
+  }
+  return null;
+}
+
 function decodePolyline(encoded) {
   const pts = [];
   let i = 0, lat = 0, lng = 0;
@@ -369,6 +397,7 @@ export default function App() {
 
   // --- all state up front ---
   const [isDark, setIsDark] = useState(isDarkHour);
+  const [now, setNow] = useState(() => new Date());
   const [isLoaded, setIsLoaded] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [groundRoute, setGroundRoute] = useState(null);
@@ -407,6 +436,18 @@ export default function App() {
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
     return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
   })();
+  const shiftInfo = (() => {
+    if (!baseId || baseId === "current") return null;
+    const active = getActiveShift(baseId, now);
+    if (!active) return { status: "none" };
+    if (!result) return { status: "idle", label: active.label };
+    const returnTime = new Date(now.getTime() + result.total * 60 * 1000);
+    const gracePeriodEnd = new Date(active.end.getTime() + 2 * 60 * 60 * 1000);
+    const rStr = t => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+    const status = returnTime <= active.end ? "green" : returnTime <= gracePeriodEnd ? "yellow" : "red";
+    return { status, label: active.label, returnStr: rStr(returnTime) };
+  })();
+
   const mapDivRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -420,7 +461,7 @@ export default function App() {
   }, [isDark]);
 
   useEffect(() => {
-    const id = setInterval(() => setIsDark(isDarkHour()), 60_000);
+    const id = setInterval(() => { setIsDark(isDarkHour()); setNow(new Date()); }, 60_000);
     return () => clearInterval(id);
   }, []);
 
@@ -695,6 +736,35 @@ export default function App() {
         .mode-btn.active.ground { background: #fffbeb; border-color: #c49a00; color: #a07800; }
         .mode-btn.active.air { background: #f0fdf4; border-color: #1a7040; color: #1a7040; }
         .mode-btn:not(.active):hover { border-color: #b0c8e0; color: #4a6a8a; }
+
+        /* SHIFT INDICATOR */
+        .shift-indicator {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-top: 10px;
+          padding: 7px 12px;
+          border-radius: 2px;
+          border: 1px solid;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          transition: background 0.3s, border-color 0.3s, color 0.3s;
+        }
+        .si-left { display: flex; align-items: center; gap: 6px; }
+        .si-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+        .si-return { font-weight: 600; }
+        .shift-indicator.si-none { background: #f8fafc; border-color: #cddbe8; color: #8aaac4; }
+        .shift-indicator.si-idle { background: #f8fafc; border-color: #cddbe8; color: #4a6a8a; }
+        .shift-indicator.si-green  { background: #f0fdf4; border-color: #1a7040; color: #1a7040; }
+        .shift-indicator.si-yellow { background: #fffbeb; border-color: #c49a00; color: #a07800; }
+        .shift-indicator.si-red    { background: #fff2f2; border-color: #c02020; color: #a01010; }
+        body[data-theme="dark"] .shift-indicator.si-none   { background: #060f18; border-color: #152434; color: #2e5a72; }
+        body[data-theme="dark"] .shift-indicator.si-idle   { background: #060f18; border-color: #2a4a60; color: #5a8a9a; }
+        body[data-theme="dark"] .shift-indicator.si-green  { background: #001810; border-color: #1e7a48; color: #1e9a58; }
+        body[data-theme="dark"] .shift-indicator.si-yellow { background: #1a1400; border-color: #d4a820; color: #d4a820; }
+        body[data-theme="dark"] .shift-indicator.si-red    { background: #1a0000; border-color: #c04040; color: #e05050; }
 
         /* DIVIDER */
         .divider {
@@ -1235,6 +1305,22 @@ export default function App() {
               onClick={() => setMode("air")}
             >Air</button>
           </div>
+
+          {shiftInfo && (
+            <div className={`shift-indicator si-${shiftInfo.status}`}>
+              <div className="si-left">
+                <div className="si-dot" />
+                <span>
+                  {shiftInfo.status === "none"
+                    ? "No active shift"
+                    : `Shift ${shiftInfo.label}`}
+                </span>
+              </div>
+              {shiftInfo.returnStr && (
+                <span className="si-return">Est. return {shiftInfo.returnStr}</span>
+              )}
+            </div>
+          )}
 
           {result ? (
             <div className="profile" key={`${baseId}-${sendingId}-${receivingId}-${mode}`}>
