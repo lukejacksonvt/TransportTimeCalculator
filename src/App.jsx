@@ -233,7 +233,11 @@ async function computeRoute(origin, waypoints, destination) {
       departureTime: new Date().toISOString(),
     }),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    console.error("Routes API 400:", err?.error?.message ?? JSON.stringify(err));
+    return null;
+  }
   const data = await res.json();
   return data?.routes?.[0] ?? null;
 }
