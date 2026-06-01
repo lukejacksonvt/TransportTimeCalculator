@@ -45,6 +45,33 @@ const BASES = [
     lng: -70.2442,
     restockId: "cmmc", // restock at CMMC before returning
   },
+  {
+    id: "sanford",
+    name: "Sanford Base",
+    label: "23 Presidential Ln, Sanford",
+    city: "Sanford",
+    lat: 43.3982,
+    lng: -70.7095,
+    restockId: null,
+  },
+  {
+    id: "emmc_base",
+    name: "EMMC Base",
+    label: "Eastern Maine Medical Center, Bangor",
+    city: "Bangor",
+    lat: 44.8012,
+    lng: -68.7778,
+    restockId: null,
+  },
+  {
+    id: "bangor_hangar",
+    name: "600 Hangar",
+    label: "189 Odlin Rd, Bangor",
+    city: "Bangor",
+    lat: 44.8050,
+    lng: -68.8200,
+    restockId: null,
+  },
 ];
 
 const CMMC_COORDS = { lat: 44.0996, lng: -70.2148 };
