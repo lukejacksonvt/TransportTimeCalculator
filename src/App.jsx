@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Loader } from "@googlemaps/js-api-loader";
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 
 const HOSPITALS = [
   { id: "aro",    name: "Aroostook Medical Center",            city: "Presque Isle", lat: 46.6814, lng: -68.0157 },
@@ -212,11 +212,8 @@ export default function App() {
   }, [baseId, sendingId, receivingId, mode, isLoaded]);
 
   useEffect(() => {
-    const loader = new Loader({
-      apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
-      version: "weekly",
-    });
-    loader.load().then(() => setIsLoaded(true));
+    setOptions({ apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY, version: "weekly" });
+    importLibrary("maps").then(() => setIsLoaded(true));
   }, []);
 
   // Init map when div mounts and API is ready
