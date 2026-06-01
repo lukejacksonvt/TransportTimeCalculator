@@ -144,9 +144,9 @@ const CMMC_STOP_MIN = 15; // blood/narcotics dropoff at CMMC (Rodman only)
 const BEDSIDE_TOTAL = 80;  // placeholder for calcLegs; overridden by bedsideMin state in component
 
 const BEDSIDE_PRESETS = [
-  { label: "Quick — 20 min", min: 20 },
-  { label: "Standard — 40 min", min: 40 },
-  { label: "Long — 60 min", min: 60, hint: "ECMO · Balloon · Impella · Isolette" },
+  { label: "20 min", min: 20 },
+  { label: "40 min", min: 40 },
+  { label: "60 min", min: 60, hint: "ECMO · Balloon · Impella · Isolette" },
 ];
 
 function haversine(lat1, lng1, lat2, lng2) {
@@ -347,6 +347,7 @@ export default function App() {
   const [locating, setLocating] = useState(false);
   const [bedsideMin, setBedsideMin] = useState(40);
   const [weatherLayer, setWeatherLayer] = useState("precip");
+  const [hospitalWeather, setHospitalWeather] = useState({});
 
   const fixedBase = BASES.find(b => b.id === baseId);
   const base = baseId === "current"
@@ -371,7 +372,7 @@ export default function App() {
     const updatedLegs = haverResult.legs.map((leg, i) => ({
       ...leg,
       time: apiLegs[i] ? Math.round(parseSecs(apiLegs[i].duration) / 60) : leg.time,
-      miles: apiLegs[i] ? Math.round(apiLegs[i].distanceMeters / 1609.34) : leg.miles,
+      miles: apiLegs[i] ? Math.round((apiLegs[i].distanceMeters ?? 0) / 1609.34) : leg.miles,
     }));
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
     return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
@@ -408,6 +409,23 @@ export default function App() {
     script.onload = () => setIsLoaded(true);
     document.head.appendChild(script);
   }, []);
+
+  useEffect(() => {
+    const key = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+    const fetchWx = async (hospital) => {
+      if (!hospital) return;
+      const res = await fetch(
+        `https://weather.googleapis.com/v1/currentConditions:lookup?key=${key}&location.latitude=${hospital.lat}&location.longitude=${hospital.lng}&units.system=IMPERIAL`
+      ).catch(() => null);
+      if (!res?.ok) return;
+      const data = await res.json().catch(() => null);
+      const temp = data?.currentConditions?.temperature?.degrees;
+      if (temp == null) return;
+      setHospitalWeather(prev => ({ ...prev, [hospital.id]: Math.round(temp) }));
+    };
+    fetchWx(sending);
+    fetchWx(receiving);
+  }, [sendingId, receivingId]);
 
   useEffect(() => {
     if (!valid || mode !== "ground") { setGroundRoute(null); return; }
@@ -461,7 +479,6 @@ export default function App() {
     if (!weatherLayer) return;
     const tileTypes = {
       precip: "US_PRECIPITATION_CURRENT",
-      temp:   "US_TEMPERATURE_CURRENT",
     };
     const key = import.meta.env.VITE_GOOGLE_MAPS_KEY;
     const type = tileTypes[weatherLayer];
@@ -753,6 +770,16 @@ export default function App() {
           color: #4a6a8a;
           margin-top: 1px;
         }
+        .bedside-wx {
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.1em;
+          color: #a07800;
+          margin-top: 1px;
+        }
+        .bedside-wx.receiving { color: #1a7040; }
+        body[data-theme="dark"] .bedside-wx { color: #d4a820; }
+        body[data-theme="dark"] .bedside-wx.receiving { color: #1e9a58; }
         .bedside-time {
           font-size: 18px;
           font-weight: 700;
@@ -1169,6 +1196,9 @@ export default function App() {
                   <div className="bedside-content">
                     <div className="bedside-label">Bedside · Sending</div>
                     <div className="bedside-name">{sending.name}</div>
+                    {hospitalWeather[sending.id] != null && (
+                      <div className="bedside-wx">{hospitalWeather[sending.id]}°F</div>
+                    )}
                     <div className="bedside-time">{formatTime(bedsideMin)}</div>
                   </div>
                 </div>
@@ -1195,6 +1225,9 @@ export default function App() {
                   <div className="bedside-content">
                     <div className="bedside-label receiving">Bedside · Receiving</div>
                     <div className="bedside-name">{receiving.name}</div>
+                    {hospitalWeather[receiving.id] != null && (
+                      <div className="bedside-wx receiving">{hospitalWeather[receiving.id]}°F</div>
+                    )}
                     <div className="bedside-time">{formatTime(bedsideMin)}</div>
                   </div>
                 </div>
@@ -1262,7 +1295,7 @@ export default function App() {
                 border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
             />
             <div className="weather-controls">
-              {[["", "Off"], ["precip", "Precip"], ["temp", "Temp"]].map(([val, label]) => (
+              {[["", "Off"], ["precip", "Precip"]].map(([val, label]) => (
                 <button
                   key={val}
                   className={`weather-btn${weatherLayer === val ? " active" : ""}`}
