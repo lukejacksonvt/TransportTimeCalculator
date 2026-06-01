@@ -195,11 +195,11 @@ function decodePolyline(encoded) {
 }
 
 async function computeRoute(origin, waypoints, destination) {
-  const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+  const key = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+  const res = await fetch(`https://routes.googleapis.com/directions/v2:computeRoutes?key=${key}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Goog-Api-Key": import.meta.env.VITE_GOOGLE_MAPS_KEY,
       "X-Goog-FieldMask": "routes.legs.duration,routes.legs.distanceMeters,routes.polyline.encodedPolyline",
     },
     body: JSON.stringify({
@@ -207,13 +207,11 @@ async function computeRoute(origin, waypoints, destination) {
       destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
       intermediates: waypoints.map(wp => ({ location: { latLng: { latitude: wp.lat, longitude: wp.lng } } })),
       travelMode: "DRIVE",
-      routingPreference: "TRAFFIC_AWARE",
-      departureTime: new Date().toISOString(),
     }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    console.error("Routes API error:", res.status, err);
+    console.error("Routes API error:", res.status, err?.error?.message ?? JSON.stringify(err));
     return null;
   }
   const data = await res.json();
