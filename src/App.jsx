@@ -410,16 +410,27 @@ export default function App() {
 
   useEffect(() => {
     if (!valid || mode !== "ground") { setGroundRoute(null); return; }
+    // When receiving IS the restock hospital, skip the duplicate intermediate
+    const receivingIsRestock = base.restockId && receiving.id === base.restockId;
     const waypoints = [
       { lat: sending.lat, lng: sending.lng },
       { lat: receiving.lat, lng: receiving.lng },
-      ...(base.restockId ? [{ lat: CMMC_COORDS.lat, lng: CMMC_COORDS.lng }] : []),
+      ...(base.restockId && !receivingIsRestock ? [{ lat: CMMC_COORDS.lat, lng: CMMC_COORDS.lng }] : []),
     ];
     computeRoute(
       { lat: base.lat, lng: base.lng },
       waypoints,
       { lat: base.lat, lng: base.lng }
-    ).then(route => setGroundRoute(route));
+    ).then(route => {
+      if (!route) { setGroundRoute(null); return; }
+      // Re-insert a zero leg for the CMMC→CMMC stop so leg indices stay aligned
+      if (receivingIsRestock && route.legs.length === 3) {
+        const legs = [route.legs[0], route.legs[1], { duration: "0s", distanceMeters: 0 }, route.legs[2]];
+        setGroundRoute({ ...route, legs });
+      } else {
+        setGroundRoute(route);
+      }
+    });
   }, [baseId, sendingId, receivingId, mode]);
 
   // Init map when div mounts and API is ready
