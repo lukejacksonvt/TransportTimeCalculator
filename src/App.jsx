@@ -220,6 +220,70 @@ function calcLegs(base, sending, receiving, mode) {
 
 const LOAD_TIME = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
+function HospitalSelect({ value, onChange, placeholder, exclude }) {
+  const [open, setOpen] = useState(false);
+  const [nhOpen, setNhOpen] = useState(false);
+  const [maOpen, setMaOpen] = useState(false);
+  const ref = useRef(null);
+
+  const available = exclude ? HOSPITALS.filter(h => h.id !== exclude) : HOSPITALS;
+  const me = available.filter(h => h.state === "ME");
+  const nh = available.filter(h => h.state === "NH");
+  const ma = available.filter(h => h.state === "MA");
+  const selected = HOSPITALS.find(h => h.id === value);
+
+  useEffect(() => {
+    const handler = e => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleToggle = () => {
+    if (!open && selected) {
+      setNhOpen(selected.state === "NH");
+      setMaOpen(selected.state === "MA");
+    }
+    setOpen(o => !o);
+  };
+
+  const pick = id => { onChange(id); setOpen(false); };
+
+  return (
+    <div className="hsel" ref={ref}>
+      <button type="button" className={`hsel-trigger${!value ? " placeholder" : ""}`} onClick={handleToggle}>
+        <span>{selected ? `${selected.name} (${selected.city})` : placeholder}</span>
+        <span className="hsel-arrow">▾</span>
+      </button>
+      {open && (
+        <div className="hsel-panel">
+          <div className="hsel-state-label">Maine</div>
+          {me.map(h => (
+            <button key={h.id} type="button" className={`hsel-option${value === h.id ? " active" : ""}`} onClick={() => pick(h.id)}>
+              {h.name}<span className="hsel-city">{h.city}</span>
+            </button>
+          ))}
+          <button type="button" className="hsel-state-toggle" onClick={() => setNhOpen(o => !o)}>
+            <span>New Hampshire</span><span>{nhOpen ? "▴" : "▾"}</span>
+          </button>
+          {nhOpen && nh.map(h => (
+            <button key={h.id} type="button" className={`hsel-option${value === h.id ? " active" : ""}`} onClick={() => pick(h.id)}>
+              {h.name}<span className="hsel-city">{h.city}</span>
+            </button>
+          ))}
+          <button type="button" className="hsel-state-toggle" onClick={() => setMaOpen(o => !o)}>
+            <span>Massachusetts</span><span>{maOpen ? "▴" : "▾"}</span>
+          </button>
+          {maOpen && ma.map(h => (
+            <button key={h.id} type="button" className={`hsel-option${value === h.id ? " active" : ""}`} onClick={() => pick(h.id)}>
+              {h.name}<span className="hsel-city">{h.city}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [baseId, setBaseId] = useState("");
   const [sendingId, setSendingId] = useState("");
@@ -754,6 +818,110 @@ export default function App() {
         }
         body[data-theme="dark"] .bedside-hint { color: #2e5a72; }
 
+        /* HOSPITAL CUSTOM SELECT */
+        .hsel { position: relative; }
+        .hsel-trigger {
+          width: 100%;
+          background: #f8fafc;
+          border: 1px solid #cddbe8;
+          color: #2a4060;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 15px;
+          padding: 9px 34px 9px 12px;
+          border-radius: 2px;
+          cursor: pointer;
+          text-align: left;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          outline: none;
+          transition: border-color 0.18s;
+        }
+        .hsel-trigger:focus, .hsel-trigger:hover { border-color: #c49a00; }
+        .hsel-trigger.placeholder { color: #8aaac4; }
+        .hsel-arrow { color: #8aaac4; font-size: 13px; flex-shrink: 0; margin-left: 8px; }
+        .hsel-panel {
+          position: absolute;
+          top: calc(100% + 2px);
+          left: 0; right: 0;
+          background: #ffffff;
+          border: 1px solid #cddbe8;
+          border-radius: 2px;
+          max-height: 300px;
+          overflow-y: auto;
+          z-index: 200;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .hsel-state-label {
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 9px;
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
+          color: #8aaac4;
+          padding: 7px 12px 5px;
+          background: #f0f4f8;
+          border-bottom: 1px solid #e8eff6;
+          position: sticky;
+          top: 0;
+        }
+        .hsel-state-toggle {
+          width: 100%;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 9px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: #4a6a8a;
+          padding: 7px 12px 5px;
+          background: #f0f4f8;
+          border: none;
+          border-top: 1px solid #e8eff6;
+          cursor: pointer;
+          text-align: left;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .hsel-state-toggle:hover { background: #e4ecf4; color: #2a4060; }
+        .hsel-option {
+          width: 100%;
+          background: none;
+          border: none;
+          border-bottom: 1px solid #f0f4f8;
+          padding: 8px 12px;
+          text-align: left;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 14px;
+          color: #2a4060;
+          cursor: pointer;
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 8px;
+          min-height: 36px;
+        }
+        .hsel-option:hover { background: #f0f4f8; }
+        .hsel-option.active { background: #fffbeb; color: #a07800; }
+        .hsel-city {
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          color: #8aaac4;
+          flex-shrink: 0;
+        }
+        .hsel-option.active .hsel-city { color: #c49a00; }
+
+        body[data-theme="dark"] .hsel-trigger { background: #060f18; border-color: #152434; color: #b8ccd8; }
+        body[data-theme="dark"] .hsel-trigger.placeholder { color: #2e5a72; }
+        body[data-theme="dark"] .hsel-arrow { color: #2e5a72; }
+        body[data-theme="dark"] .hsel-panel { background: #0b1520; border-color: #152434; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+        body[data-theme="dark"] .hsel-state-label { color: #2e5a72; background: #060f18; border-color: #0d2030; }
+        body[data-theme="dark"] .hsel-state-toggle { color: #5a8a9a; background: #060f18; border-color: #0d2030; }
+        body[data-theme="dark"] .hsel-state-toggle:hover { background: #0d2030; color: #8aacbe; }
+        body[data-theme="dark"] .hsel-option { color: #8aacbe; border-color: #0d2030; }
+        body[data-theme="dark"] .hsel-option:hover { background: #0d2030; }
+        body[data-theme="dark"] .hsel-option.active { background: #1a1400; color: #d4a820; }
+        body[data-theme="dark"] .hsel-city { color: #2e5a72; }
+        body[data-theme="dark"] .hsel-option.active .hsel-city { color: #a07820; }
+
         /* THEME TRANSITIONS */
         body, .card, select, .mode-btn, .total-box, .leg-dot, .bedside-dot {
           transition: background 0.4s, color 0.4s, border-color 0.4s;
@@ -847,26 +1015,21 @@ export default function App() {
 
             <div className="field">
               <div className="sec-label">Sending Hospital</div>
-              <div className="sel-wrap">
-                <select value={sendingId} onChange={e => setSendingId(e.target.value)}>
-                  <option value="">— Select sending hospital —</option>
-                  {HOSPITALS.map(h => (
-                    <option key={h.id} value={h.id}>{h.name} ({h.city})</option>
-                  ))}
-                </select>
-              </div>
+              <HospitalSelect
+                value={sendingId}
+                onChange={setSendingId}
+                placeholder="— Select sending hospital —"
+              />
             </div>
 
             <div className="field">
               <div className="sec-label">Receiving Hospital</div>
-              <div className="sel-wrap">
-                <select value={receivingId} onChange={e => setReceivingId(e.target.value)}>
-                  <option value="">— Select receiving hospital —</option>
-                  {HOSPITALS.filter(h => h.id !== sendingId).map(h => (
-                    <option key={h.id} value={h.id}>{h.name} ({h.city})</option>
-                  ))}
-                </select>
-              </div>
+              <HospitalSelect
+                value={receivingId}
+                onChange={setReceivingId}
+                placeholder="— Select receiving hospital —"
+                exclude={sendingId}
+              />
             </div>
           </div>
 
