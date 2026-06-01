@@ -301,8 +301,8 @@ export default function App() {
 
         /* HEADER */
         .header { margin-bottom: 24px; }
-        .header-row { display: flex; align-items: center; gap: 12px; }
-        .sol { width: 36px; height: 36px; }
+        .header-row { display: flex; align-items: center; gap: 16px; }
+        .logo { height: 48px; width: auto; }
         .title { font-size: 24px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #1a2d40; line-height: 1; }
         .sub { font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 0.18em; color: #8aaac4; margin-top: 5px; }
 
@@ -657,17 +657,10 @@ export default function App() {
       <div className="wrap">
         <div className="header">
           <div className="header-row">
-            <svg className="sol" viewBox="0 0 100 100" fill="none">
-              {[0,60,120].map(a => (
-                <rect key={a} x="41" y="8" width="18" height="84" rx="4"
-                  fill="#0d1e10" stroke="#1e7a48" strokeWidth="1.5"
-                  transform={`rotate(${a} 50 50)`} />
-              ))}
-              <path d="M50 22 L44 32 H48 V42 H52 V32 H56 Z" fill="#d4a820" />
-            </svg>
+            <img src="/lifeflight-logo.svg" className="logo" alt="LifeFlight of Maine" />
             <div>
               <div className="title">Mission Time Calculator</div>
-              <div className="sub">LifeFlight of Maine · Full Transport Profile</div>
+              <div className="sub">Full Transport Profile</div>
             </div>
           </div>
         </div>
