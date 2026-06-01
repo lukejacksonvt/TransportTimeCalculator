@@ -9,6 +9,7 @@ const HOSPITALS = [
   { id: "emmc",   name: "Eastern Maine Medical Center",        city: "Bangor",       lat: 44.8012, lng: -68.7778 },
   { id: "nfh",    name: "Franklin Memorial Hospital",          city: "Farmington",   lat: 44.6700, lng: -70.1520 },
   { id: "mgh",    name: "Maine General – Augusta",             city: "Augusta",      lat: 44.3106, lng: -69.7795 },
+  { id: "mgt",    name: "Maine General – Thayer",             city: "Waterville",   lat: 44.5516, lng: -69.6350 },
   { id: "mmmc",   name: "Maine Medical Center",                city: "Portland",     lat: 43.6591, lng: -70.2568 },
   { id: "smhc",   name: "Maine Medical Center – Biddeford",   city: "Biddeford",    lat: 43.4887, lng: -70.4534 },
   { id: "mhnc",   name: "Memorial Hospital",                   city: "North Conway", lat: 44.0540, lng: -71.1270 },
