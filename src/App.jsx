@@ -245,7 +245,7 @@ export default function App() {
   // --- derived values ---
   const valid = base && sending && receiving && sendingId !== receivingId;
   const isRodman = base?.restockId != null;
-  const legMeta = mode === "ground" && groundRoute ? "live traffic" : "transit";
+  const legMeta = trafficLive ? "live traffic" : groundRoute ? "road routing" : "transit";
 
   const bedsideTotal = bedsideMin * 2;
   const haverResult = valid ? calcLegs(base, sending, receiving, mode) : null;
