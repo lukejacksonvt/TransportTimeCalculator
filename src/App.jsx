@@ -196,30 +196,29 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    setOptions({ apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY, version: "weekly" });
+    Promise.all([importLibrary("maps"), importLibrary("routes")])
+      .then(([, { DirectionsService }]) => {
+        directionsServiceRef.current = new DirectionsService();
+        setIsLoaded(true);
+      });
+  }, []);
+
+  useEffect(() => {
     if (!valid || !isLoaded || mode !== "ground" || !directionsServiceRef.current) { setGroundRoute(null); return; }
-    const svc = directionsServiceRef.current;
     const waypoints = [
       { location: { lat: sending.lat, lng: sending.lng }, stopover: true },
       { location: { lat: receiving.lat, lng: receiving.lng }, stopover: true },
       ...(base.restockId ? [{ location: CMMC_COORDS, stopover: true }] : []),
     ];
-    svc.route({
+    directionsServiceRef.current.route({
       origin: { lat: base.lat, lng: base.lng },
       destination: { lat: base.lat, lng: base.lng },
       waypoints,
       travelMode: "DRIVING",
       optimizeWaypoints: false,
-    }, (res, status) => setGroundRoute(status === "OK" ? res : null));
+    }).then(res => setGroundRoute(res)).catch(() => setGroundRoute(null));
   }, [baseId, sendingId, receivingId, mode, isLoaded]);
-
-  useEffect(() => {
-    setOptions({ apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY, version: "weekly" });
-    Promise.all([importLibrary("maps"), importLibrary("routes")])
-      .then(([, routesLib]) => {
-        directionsServiceRef.current = new routesLib.DirectionsService();
-        setIsLoaded(true);
-      });
-  }, []);
 
   // Init map when div mounts and API is ready
   useEffect(() => {
