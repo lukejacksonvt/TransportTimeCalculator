@@ -436,16 +436,27 @@ export default function App() {
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
     return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
   })();
+  const nearestBase = (() => {
+    if (baseId !== "current" || !currentPos) return null;
+    return BASES.reduce((best, b) => {
+      const d = haversine(currentPos.lat, currentPos.lng, b.lat, b.lng);
+      return !best || d < best.d ? { b, d } : best;
+    }, null)?.b ?? null;
+  })();
+
   const shiftInfo = (() => {
-    if (!baseId || baseId === "current") return null;
-    const active = getActiveShift(baseId, now);
-    if (!active) return { status: "none" };
-    if (!result) return { status: "idle", label: active.label };
+    if (!baseId) return null;
+    const shiftBaseId = baseId === "current" ? nearestBase?.id : baseId;
+    if (!shiftBaseId) return null;
+    const active = getActiveShift(shiftBaseId, now);
+    const inferredName = baseId === "current" ? nearestBase?.name : null;
+    if (!active) return { status: "none", inferredName };
+    if (!result) return { status: "idle", label: active.label, inferredName };
     const returnTime = new Date(now.getTime() + result.total * 60 * 1000);
     const gracePeriodEnd = new Date(active.end.getTime() + 2 * 60 * 60 * 1000);
     const rStr = t => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
     const status = returnTime <= active.end ? "green" : returnTime <= gracePeriodEnd ? "yellow" : "red";
-    return { status, label: active.label, returnStr: rStr(returnTime) };
+    return { status, label: active.label, returnStr: rStr(returnTime), inferredName };
   })();
 
   const mapDivRef = useRef(null);
@@ -1314,6 +1325,9 @@ export default function App() {
                   {shiftInfo.status === "none"
                     ? "No active shift"
                     : `Shift ${shiftInfo.label}`}
+                  {shiftInfo.inferredName && (
+                    <span style={{ opacity: 0.7, marginLeft: 6 }}>· {shiftInfo.inferredName}</span>
+                  )}
                 </span>
               </div>
               {shiftInfo.returnStr && (
