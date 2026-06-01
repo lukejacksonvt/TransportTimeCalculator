@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { GoogleMap, useJsApiLoader, Marker, Polyline } from "@react-google-maps/api";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Loader } from "@googlemaps/js-api-loader";
 
 const HOSPITALS = [
   { id: "aro",    name: "Aroostook Medical Center",            city: "Presque Isle", lat: 46.6814, lng: -68.0157 },
@@ -208,31 +208,84 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
-  });
-
-  const mapRef = useRef(null);
-  const onMapLoad = useCallback((map) => { mapRef.current = map; }, []);
-
-  const routePoints = valid ? [
-    { lat: base.lat, lng: base.lng },
-    { lat: sending.lat, lng: sending.lng },
-    { lat: receiving.lat, lng: receiving.lng },
-    ...(base.restockId ? [CMMC_COORDS] : []),
-    { lat: base.lat, lng: base.lng },
-  ] : [];
+  const [isLoaded, setIsLoaded] = useState(false);
+  const mapDivRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
+  const polylineRef = useRef(null);
 
   useEffect(() => {
-    if (!mapRef.current || !valid || !window.google) return;
-    if (groundRoute) {
-      mapRef.current.fitBounds(groundRoute.routes[0].bounds, 60);
+    const loader = new Loader({
+      apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
+      version: "weekly",
+    });
+    loader.load().then(() => setIsLoaded(true));
+  }, []);
+
+  // Init map when div mounts and API is ready
+  useEffect(() => {
+    if (!isLoaded || !mapDivRef.current || mapInstanceRef.current) return;
+    mapInstanceRef.current = new window.google.maps.Map(mapDivRef.current, {
+      center: { lat: 44.5, lng: -69.5 },
+      zoom: 7,
+      styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
+      disableDefaultUI: true,
+      zoomControl: true,
+      gestureHandling: "cooperative",
+    });
+  }, [isLoaded, result]);
+
+  // Update map styles when theme changes
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    mapInstanceRef.current.setOptions({ styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT });
+  }, [isDark]);
+
+  // Update markers, polyline, and fitBounds when route changes
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google) return;
+    markersRef.current.forEach(m => m.setMap(null));
+    markersRef.current = [];
+    if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
+    if (!valid) return;
+
+    const mkr = (position, fillColor, strokeColor) => {
+      const m = new window.google.maps.Marker({
+        position, map: mapInstanceRef.current,
+        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 9,
+          fillColor, fillOpacity: 1, strokeColor, strokeWeight: 2 }
+      });
+      markersRef.current.push(m);
+    };
+    mkr({ lat: base.lat, lng: base.lng }, "#2e5a72", "#4a8aaa");
+    mkr({ lat: sending.lat, lng: sending.lng }, "#d4a820", "#f0c840");
+    mkr({ lat: receiving.lat, lng: receiving.lng }, "#1e7a48", "#2eb868");
+
+    const isGroundWithRoute = mode === "ground" && groundRoute;
+    const path = isGroundWithRoute
+      ? groundRoute.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }))
+      : [
+          { lat: base.lat, lng: base.lng },
+          { lat: sending.lat, lng: sending.lng },
+          { lat: receiving.lat, lng: receiving.lng },
+          ...(base.restockId ? [CMMC_COORDS] : []),
+          { lat: base.lat, lng: base.lng },
+        ];
+
+    polylineRef.current = new window.google.maps.Polyline({
+      path, map: mapInstanceRef.current,
+      strokeColor: mode === "air" ? "#1e9a58" : "#d4a820",
+      strokeOpacity: 0.85, strokeWeight: 3,
+    });
+
+    if (isGroundWithRoute) {
+      mapInstanceRef.current.fitBounds(groundRoute.routes[0].bounds, 60);
     } else {
       const bounds = new window.google.maps.LatLngBounds();
-      routePoints.forEach(pt => bounds.extend(pt));
-      mapRef.current.fitBounds(bounds, 60);
+      path.forEach(pt => bounds.extend(pt));
+      mapInstanceRef.current.fitBounds(bounds, 60);
     }
-  }, [baseId, sendingId, receivingId, groundRoute]);
+  }, [valid, baseId, sendingId, receivingId, mode, groundRoute]);
 
   return (
     <>
@@ -786,41 +839,12 @@ export default function App() {
           )}
         </div>
 
-        {result && isLoaded && (
-          <div style={{ marginTop: 16, borderRadius: 4, overflow: "hidden", border: "1px solid #152434" }}>
-            <GoogleMap
-              mapContainerStyle={{ width: "100%", height: 320 }}
-              center={{ lat: 44.5, lng: -69.5 }}
-              zoom={7}
-              options={{ styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT, disableDefaultUI: true, zoomControl: true, gestureHandling: "cooperative" }}
-              onLoad={onMapLoad}
-            >
-              <Polyline
-                path={
-                  mode === "ground" && groundRoute
-                    ? groundRoute.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }))
-                    : routePoints
-                }
-                options={{
-                  strokeColor: mode === "air" ? "#1e9a58" : "#d4a820",
-                  strokeOpacity: 0.85,
-                  strokeWeight: 3,
-                }}
-              />
-              <Marker
-                position={{ lat: base.lat, lng: base.lng }}
-                icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#2e5a72", fillOpacity: 1, strokeColor: "#4a8aaa", strokeWeight: 2 }}
-              />
-              <Marker
-                position={{ lat: sending.lat, lng: sending.lng }}
-                icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: "#d4a820", fillOpacity: 1, strokeColor: "#f0c840", strokeWeight: 2 }}
-              />
-              <Marker
-                position={{ lat: receiving.lat, lng: receiving.lng }}
-                icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: "#1e7a48", fillOpacity: 1, strokeColor: "#2eb868", strokeWeight: 2 }}
-              />
-            </GoogleMap>
-          </div>
+        {isLoaded && result && (
+          <div
+            ref={mapDivRef}
+            style={{ marginTop: 16, borderRadius: 4, overflow: "hidden", height: 320,
+              border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
+          />
         )}
       </div>
     </>
