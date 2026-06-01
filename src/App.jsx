@@ -754,6 +754,8 @@ export default function App() {
           <div style={{ marginTop: 16, borderRadius: 4, overflow: "hidden", border: "1px solid #152434" }}>
             <GoogleMap
               mapContainerStyle={{ width: "100%", height: 320 }}
+              center={{ lat: 44.5, lng: -69.5 }}
+              zoom={7}
               options={{ styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT, disableDefaultUI: true, zoomControl: true, gestureHandling: "cooperative" }}
               onLoad={onMapLoad}
             >
