@@ -176,6 +176,46 @@ function formatTime(mins) {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
+// Parse Routes API duration string e.g. "3600s" → 3600
+const parseSecs = s => parseInt(s) || 0;
+
+function decodePolyline(encoded) {
+  const pts = [];
+  let i = 0, lat = 0, lng = 0;
+  while (i < encoded.length) {
+    let b, shift = 0, result = 0;
+    do { b = encoded.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = result = 0;
+    do { b = encoded.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    pts.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return pts;
+}
+
+async function computeRoute(origin, waypoints, destination) {
+  const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": import.meta.env.VITE_GOOGLE_MAPS_KEY,
+      "X-Goog-FieldMask": "routes.legs.duration,routes.legs.distanceMeters,routes.polyline.encodedPolyline",
+    },
+    body: JSON.stringify({
+      origin:      { location: { latLng: { latitude: origin.lat,      longitude: origin.lng      } } },
+      destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+      intermediates: waypoints.map(wp => ({ location: { latLng: { latitude: wp.lat, longitude: wp.lng } } })),
+      travelMode: "DRIVE",
+      routingPreference: "TRAFFIC_AWARE",
+      departureTime: new Date().toISOString(),
+    }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.routes?.[0] ?? null;
+}
+
 
 function calcLegs(base, sending, receiving, mode) {
   const timeFn = mode === "air" ? flightMin : groundMin;
@@ -308,7 +348,6 @@ export default function App() {
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
   const [bedsideMin, setBedsideMin] = useState(40);
-  const [trafficLive, setTrafficLive] = useState(false);
 
   const fixedBase = BASES.find(b => b.id === baseId);
   const base = baseId === "current"
@@ -320,7 +359,7 @@ export default function App() {
   // --- derived values ---
   const valid = base && sending && receiving && sendingId !== receivingId;
   const isRodman = base?.restockId != null;
-  const legMeta = trafficLive ? "live traffic" : groundRoute ? "road routing" : "transit";
+  const legMeta = groundRoute ? "road routing" : "transit";
 
   const bedsideTotal = bedsideMin * 2;
   const haverResult = valid ? calcLegs(base, sending, receiving, mode) : null;
@@ -329,11 +368,11 @@ export default function App() {
     if (mode !== "ground" || !groundRoute) {
       return { ...haverResult, total: haverResult.transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
     }
-    const apiLegs = groundRoute.routes[0].legs;
+    const apiLegs = groundRoute.legs;
     const updatedLegs = haverResult.legs.map((leg, i) => ({
       ...leg,
-      time: apiLegs[i] ? Math.round((apiLegs[i].duration_in_traffic?.value ?? apiLegs[i].duration.value) / 60) : leg.time,
-      miles: apiLegs[i] ? Math.round(apiLegs[i].distance.value / 1609.34) : leg.miles,
+      time: apiLegs[i] ? Math.round(parseSecs(apiLegs[i].duration) / 60) : leg.time,
+      miles: apiLegs[i] ? Math.round(apiLegs[i].distanceMeters / 1609.34) : leg.miles,
     }));
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
     return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
@@ -342,7 +381,6 @@ export default function App() {
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const polylineRef = useRef(null);
-  const directionsServiceRef = useRef(null);
 
   useEffect(() => {
     document.body.dataset.theme = isDark ? "dark" : "light";
@@ -365,48 +403,25 @@ export default function App() {
 
   useEffect(() => {
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}&libraries=routes`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}&libraries=marker`;
     script.async = true;
-    script.onload = () => {
-      directionsServiceRef.current = new window.google.maps.DirectionsService();
-      setIsLoaded(true);
-    };
+    script.onload = () => setIsLoaded(true);
     document.head.appendChild(script);
   }, []);
 
   useEffect(() => {
-    if (!valid || !isLoaded || mode !== "ground" || !directionsServiceRef.current) { setGroundRoute(null); setTrafficLive(false); return; }
+    if (!valid || mode !== "ground") { setGroundRoute(null); return; }
     const waypoints = [
-      { location: { lat: sending.lat, lng: sending.lng }, stopover: true },
-      { location: { lat: receiving.lat, lng: receiving.lng }, stopover: true },
-      ...(base.restockId ? [{ location: CMMC_COORDS, stopover: true }] : []),
+      { lat: sending.lat, lng: sending.lng },
+      { lat: receiving.lat, lng: receiving.lng },
+      ...(base.restockId ? [{ lat: CMMC_COORDS.lat, lng: CMMC_COORDS.lng }] : []),
     ];
-    directionsServiceRef.current.route({
-      origin: { lat: base.lat, lng: base.lng },
-      destination: { lat: base.lat, lng: base.lng },
+    computeRoute(
+      { lat: base.lat, lng: base.lng },
       waypoints,
-      travelMode: window.google.maps.TravelMode.DRIVING,
-      optimizeWaypoints: false,
-      drivingOptions: { departureTime: new Date(), trafficModel: "bestguess" },
-    }, (res, status) => {
-      if (status === "OK") {
-        const legs = res.routes[0]?.legs ?? [];
-        console.group("🚗 Directions API response");
-        console.log("status:", status);
-        legs.forEach((leg, i) => {
-          console.log(`Leg ${i + 1}: duration=${leg.duration?.text}, duration_in_traffic=${leg.duration_in_traffic?.text ?? "MISSING"}`);
-        });
-        console.log("Full response:", res);
-        console.groupEnd();
-        setGroundRoute(res);
-        setTrafficLive(legs.some(l => l.duration_in_traffic));
-      } else {
-        console.warn("🚗 Directions API failed:", status);
-        setGroundRoute(null);
-        setTrafficLive(false);
-      }
-    });
-  }, [baseId, sendingId, receivingId, mode, isLoaded]);
+      { lat: base.lat, lng: base.lng }
+    ).then(route => setGroundRoute(route));
+  }, [baseId, sendingId, receivingId, mode]);
 
   // Init map when div mounts and API is ready
   useEffect(() => {
@@ -414,6 +429,7 @@ export default function App() {
     mapInstanceRef.current = new window.google.maps.Map(mapDivRef.current, {
       center: { lat: 44.5, lng: -69.5 },
       zoom: 7,
+      mapId: "lifeflight_map",
       styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
       disableDefaultUI: true,
       zoomControl: true,
@@ -436,11 +452,9 @@ export default function App() {
     if (!valid) return;
 
     const mkr = (position, fillColor, strokeColor) => {
-      const m = new window.google.maps.Marker({
-        position, map: mapInstanceRef.current,
-        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 9,
-          fillColor, fillOpacity: 1, strokeColor, strokeWeight: 2 }
-      });
+      const el = document.createElement("div");
+      el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${fillColor};border:2px solid ${strokeColor};`;
+      const m = new window.google.maps.marker.AdvancedMarkerElement({ position, map: mapInstanceRef.current, content: el });
       markersRef.current.push(m);
     };
     mkr({ lat: base.lat, lng: base.lng }, "#2e5a72", "#4a8aaa");
@@ -449,7 +463,7 @@ export default function App() {
 
     const isGroundWithRoute = mode === "ground" && groundRoute;
     const path = isGroundWithRoute
-      ? groundRoute.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }))
+      ? decodePolyline(groundRoute.polyline.encodedPolyline)
       : [
           { lat: base.lat, lng: base.lng },
           { lat: sending.lat, lng: sending.lng },
@@ -464,13 +478,9 @@ export default function App() {
       strokeOpacity: 0.85, strokeWeight: 3,
     });
 
-    if (isGroundWithRoute) {
-      mapInstanceRef.current.fitBounds(groundRoute.routes[0].bounds, 60);
-    } else {
-      const bounds = new window.google.maps.LatLngBounds();
-      path.forEach(pt => bounds.extend(pt));
-      mapInstanceRef.current.fitBounds(bounds, 60);
-    }
+    const bounds = new window.google.maps.LatLngBounds();
+    path.forEach(pt => bounds.extend(pt));
+    mapInstanceRef.current.fitBounds(bounds, 60);
   }, [valid, baseId, sendingId, receivingId, mode, groundRoute]);
 
   return (
@@ -811,13 +821,7 @@ export default function App() {
           border: 1px solid #1a7040;
           color: #1a7040;
         }
-        .live-badge.no-traffic {
-          background: #fffbeb;
-          border-color: #c49a00;
-          color: #a07800;
-        }
         body[data-theme="dark"] .live-badge { background: #001810; border-color: #1e7a48; color: #1e9a58; }
-        body[data-theme="dark"] .live-badge.no-traffic { background: #1a1400; border-color: #d4a820; color: #d4a820; }
 
         /* BEDSIDE PRESET SELECTOR */
         .bedside-row {
@@ -1071,9 +1075,7 @@ export default function App() {
 
               {mode === "ground" && groundRoute && (
                 <div className="live-status">
-                  <span className={`live-badge${trafficLive ? "" : " no-traffic"}`}>
-                    {trafficLive ? "⬤ Live Traffic" : "⚠ No Traffic Data"}
-                  </span>
+                  <span className="live-badge">● Road Routing</span>
                 </div>
               )}
 
@@ -1173,7 +1175,7 @@ export default function App() {
               </div>
 
               <div className="disclaimer">
-                ⚠ Ground: live traffic via Google Maps Directions · Air: straight-line 150 kts + 10 min ops · Estimates only — not for clinical decision-making
+                ⚠ Ground: road routing via Google Routes API (traffic-aware) · Air: straight-line 150 kts + 10 min ops · Estimates only — not for clinical decision-making
               </div>
             </div>
           ) : (
