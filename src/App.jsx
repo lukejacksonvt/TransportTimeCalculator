@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import { GoogleMap, useJsApiLoader, Marker, Polyline } from "@react-google-maps/api";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { GoogleMap, useJsApiLoader, Marker, Polyline, DirectionsRenderer } from "@react-google-maps/api";
 
 const HOSPITALS = [
   { id: "aro",    name: "Aroostook Medical Center",            city: "Presque Isle", lat: 46.6814, lng: -68.0157 },
@@ -9,7 +9,6 @@ const HOSPITALS = [
   { id: "dcmh",   name: "Down East Community Hospital",        city: "Machias",      lat: 44.7166, lng: -67.4637 },
   { id: "emmc",   name: "Eastern Maine Medical Center",        city: "Bangor",       lat: 44.8012, lng: -68.7778 },
   { id: "nfh",    name: "Franklin Memorial Hospital",          city: "Farmington",   lat: 44.6700, lng: -70.1520 },
-  { id: "iph",    name: "Island Medical Center",               city: "Vinalhaven",   lat: 44.0521, lng: -68.8270 },
   { id: "mgh",    name: "Maine General – Augusta",             city: "Augusta",      lat: 44.3106, lng: -69.7795 },
   { id: "mmmc",   name: "Maine Medical Center",                city: "Portland",     lat: 43.6591, lng: -70.2568 },
   { id: "smhc",   name: "Maine Medical Center – Biddeford",   city: "Biddeford",    lat: 43.4887, lng: -70.4534 },
@@ -161,7 +160,40 @@ export default function App() {
   const receiving = HOSPITALS.find(h => h.id === receivingId);
 
   const valid = base && sending && receiving && sendingId !== receivingId;
-  const result = valid ? calcLegs(base, sending, receiving, mode) : null;
+  const [groundRoute, setGroundRoute] = useState(null);
+
+  useEffect(() => {
+    if (!valid || !isLoaded || mode !== "ground") { setGroundRoute(null); return; }
+    const svc = new window.google.maps.DirectionsService();
+    const waypoints = [
+      { location: { lat: sending.lat, lng: sending.lng }, stopover: true },
+      { location: { lat: receiving.lat, lng: receiving.lng }, stopover: true },
+      ...(base.restockId ? [{ location: CMMC_COORDS, stopover: true }] : []),
+    ];
+    svc.route({
+      origin: { lat: base.lat, lng: base.lng },
+      destination: { lat: base.lat, lng: base.lng },
+      waypoints,
+      travelMode: window.google.maps.TravelMode.DRIVING,
+      optimizeWaypoints: false,
+    }, (res, status) => setGroundRoute(status === "OK" ? res : null));
+  }, [baseId, sendingId, receivingId, mode, isLoaded]);
+
+  const result = useMemo(() => {
+    if (!valid) return null;
+    const base_result = calcLegs(base, sending, receiving, mode);
+    if (mode === "ground" && groundRoute) {
+      const apiLegs = groundRoute.routes[0].legs;
+      const updatedLegs = base_result.legs.map((leg, i) => ({
+        ...leg,
+        time: apiLegs[i] ? Math.round(apiLegs[i].duration.value / 60) : leg.time,
+        miles: apiLegs[i] ? Math.round(apiLegs[i].distance.value / 1609.34) : leg.miles,
+      }));
+      const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
+      return { ...base_result, legs: updatedLegs, transit, total: transit + BEDSIDE_TOTAL };
+    }
+    return base_result;
+  }, [valid, baseId, sendingId, receivingId, mode, groundRoute]);
 
   const isRodman = base?.restockId != null;
 
@@ -193,10 +225,14 @@ export default function App() {
 
   useEffect(() => {
     if (!mapRef.current || !valid || !window.google) return;
-    const bounds = new window.google.maps.LatLngBounds();
-    routePoints.forEach(pt => bounds.extend(pt));
-    mapRef.current.fitBounds(bounds, 60);
-  }, [baseId, sendingId, receivingId]);
+    if (groundRoute) {
+      mapRef.current.fitBounds(groundRoute.routes[0].bounds, 60);
+    } else {
+      const bounds = new window.google.maps.LatLngBounds();
+      routePoints.forEach(pt => bounds.extend(pt));
+      mapRef.current.fitBounds(bounds, 60);
+    }
+  }, [baseId, sendingId, receivingId, groundRoute]);
 
   return (
     <>
@@ -759,14 +795,20 @@ export default function App() {
               options={{ styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT, disableDefaultUI: true, zoomControl: true, gestureHandling: "cooperative" }}
               onLoad={onMapLoad}
             >
-              <Polyline
-                path={routePoints}
-                options={{
-                  strokeColor: mode === "air" ? "#1e9a58" : "#d4a820",
-                  strokeOpacity: 0.85,
-                  strokeWeight: 2.5,
-                }}
-              />
+              {mode === "ground" && groundRoute ? (
+                <DirectionsRenderer
+                  directions={groundRoute}
+                  options={{
+                    suppressMarkers: true,
+                    polylineOptions: { strokeColor: "#d4a820", strokeOpacity: 0.85, strokeWeight: 3 },
+                  }}
+                />
+              ) : (
+                <Polyline
+                  path={routePoints}
+                  options={{ strokeColor: "#1e9a58", strokeOpacity: 0.85, strokeWeight: 2.5 }}
+                />
+              )}
               <Marker
                 position={{ lat: base.lat, lng: base.lng }}
                 icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#2e5a72", fillOpacity: 1, strokeColor: "#4a8aaa", strokeWeight: 2 }}
