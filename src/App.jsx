@@ -376,7 +376,7 @@ export default function App() {
   const [locating, setLocating] = useState(false);
   const [bedsideMin, setBedsideMin] = useState(40);
   const [weatherLayer, setWeatherLayer] = useState("precip");
-  const [showTraffic, setShowTraffic] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(true);
   const [hospitalWeather, setHospitalWeather] = useState({});
 
   const fixedBase = BASES.find(b => b.id === baseId);
