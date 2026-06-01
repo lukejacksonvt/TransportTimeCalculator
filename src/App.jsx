@@ -182,14 +182,19 @@ export default function App() {
   const [receivingId, setReceivingId] = useState("");
   const [mode, setMode] = useState("ground");
 
-  const base = BASES.find(b => b.id === baseId);
-  const sending = HOSPITALS.find(h => h.id === sendingId);
-  const receiving = HOSPITALS.find(h => h.id === receivingId);
-
   // --- all state up front ---
   const [isDark, setIsDark] = useState(isDarkHour);
   const [isLoaded, setIsLoaded] = useState(false);
   const [groundRoute, setGroundRoute] = useState(null);
+  const [currentPos, setCurrentPos] = useState(null);
+  const [locating, setLocating] = useState(false);
+
+  const fixedBase = BASES.find(b => b.id === baseId);
+  const base = baseId === "current"
+    ? (currentPos ? { id: "current", name: "Current Location", city: "Current Location", lat: currentPos.lat, lng: currentPos.lng, restockId: null } : null)
+    : fixedBase;
+  const sending = HOSPITALS.find(h => h.id === sendingId);
+  const receiving = HOSPITALS.find(h => h.id === receivingId);
 
   // --- derived values ---
   const valid = base && sending && receiving && sendingId !== receivingId;
@@ -221,6 +226,16 @@ export default function App() {
     const id = setInterval(() => setIsDark(isDarkHour()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (baseId !== "current") { setCurrentPos(null); setLocating(false); return; }
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+      () => { setLocating(false); alert("Unable to get location. Please check your browser permissions."); setBaseId(""); }
+    );
+  }, [baseId]);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -704,6 +719,7 @@ export default function App() {
               <div className="sel-wrap">
                 <select value={baseId} onChange={e => setBaseId(e.target.value)}>
                   <option value="">— Select base —</option>
+                  <option value="current">{locating ? "Locating..." : "Current Location (GPS)"}</option>
                   {BASES.map(b => (
                     <option key={b.id} value={b.id}>{b.name} ({b.city})</option>
                   ))}
