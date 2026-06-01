@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { GoogleMap, useJsApiLoader, Marker, Polyline, DirectionsRenderer } from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader, Marker, Polyline } from "@react-google-maps/api";
 
 const HOSPITALS = [
   { id: "aro",    name: "Aroostook Medical Center",            city: "Presque Isle", lat: 46.6814, lng: -68.0157 },
@@ -795,20 +795,18 @@ export default function App() {
               options={{ styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT, disableDefaultUI: true, zoomControl: true, gestureHandling: "cooperative" }}
               onLoad={onMapLoad}
             >
-              {mode === "ground" && groundRoute ? (
-                <DirectionsRenderer
-                  directions={groundRoute}
-                  options={{
-                    suppressMarkers: true,
-                    polylineOptions: { strokeColor: "#d4a820", strokeOpacity: 0.85, strokeWeight: 3 },
-                  }}
-                />
-              ) : (
-                <Polyline
-                  path={routePoints}
-                  options={{ strokeColor: "#1e9a58", strokeOpacity: 0.85, strokeWeight: 2.5 }}
-                />
-              )}
+              <Polyline
+                path={
+                  mode === "ground" && groundRoute
+                    ? groundRoute.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }))
+                    : routePoints
+                }
+                options={{
+                  strokeColor: mode === "air" ? "#1e9a58" : "#d4a820",
+                  strokeOpacity: 0.85,
+                  strokeWeight: 3,
+                }}
+              />
               <Marker
                 position={{ lat: base.lat, lng: base.lng }}
                 icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#2e5a72", fillOpacity: 1, strokeColor: "#4a8aaa", strokeWeight: 2 }}
