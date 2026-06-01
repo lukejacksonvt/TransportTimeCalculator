@@ -390,9 +390,18 @@ export default function App() {
       drivingOptions: { departureTime: new Date(), trafficModel: "bestguess" },
     }, (res, status) => {
       if (status === "OK") {
+        const legs = res.routes[0]?.legs ?? [];
+        console.group("🚗 Directions API response");
+        console.log("status:", status);
+        legs.forEach((leg, i) => {
+          console.log(`Leg ${i + 1}: duration=${leg.duration?.text}, duration_in_traffic=${leg.duration_in_traffic?.text ?? "MISSING"}`);
+        });
+        console.log("Full response:", res);
+        console.groupEnd();
         setGroundRoute(res);
-        setTrafficLive(res.routes[0]?.legs?.some(l => l.duration_in_traffic) ?? false);
+        setTrafficLive(legs.some(l => l.duration_in_traffic));
       } else {
+        console.warn("🚗 Directions API failed:", status);
         setGroundRoute(null);
         setTrafficLive(false);
       }
