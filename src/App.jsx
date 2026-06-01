@@ -231,7 +231,6 @@ async function computeRoute(origin, waypoints, destination) {
       intermediates: waypoints.map(wp => ({ location: { latLng: { latitude: wp.lat, longitude: wp.lng } } })),
       travelMode: "DRIVE",
       routingPreference: "TRAFFIC_AWARE",
-      departureTime: new Date().toISOString(),
     }),
   });
   if (!res.ok) {
