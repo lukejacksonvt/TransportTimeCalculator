@@ -415,11 +415,11 @@ export default function App() {
     const fetchWx = async (hospital) => {
       if (!hospital) return;
       const res = await fetch(
-        `https://weather.googleapis.com/v1/currentConditions:lookup?key=${key}&location.latitude=${hospital.lat}&location.longitude=${hospital.lng}&units.system=IMPERIAL`
+        `https://weather.googleapis.com/v1/currentConditions:lookup?key=${key}&location.latitude=${hospital.lat}&location.longitude=${hospital.lng}&unitsSystem=IMPERIAL`
       ).catch(() => null);
       if (!res?.ok) return;
       const data = await res.json().catch(() => null);
-      const temp = data?.currentConditions?.temperature?.degrees;
+      const temp = data?.temperature?.degrees;
       if (temp == null) return;
       setHospitalWeather(prev => ({ ...prev, [hospital.id]: Math.round(temp) }));
     };
