@@ -211,7 +211,11 @@ async function computeRoute(origin, waypoints, destination) {
       departureTime: new Date().toISOString(),
     }),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error("Routes API error:", res.status, err);
+    return null;
+  }
   const data = await res.json();
   return data?.routes?.[0] ?? null;
 }
@@ -403,7 +407,7 @@ export default function App() {
 
   useEffect(() => {
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}&libraries=marker`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}`;
     script.async = true;
     script.onload = () => setIsLoaded(true);
     document.head.appendChild(script);
@@ -429,7 +433,6 @@ export default function App() {
     mapInstanceRef.current = new window.google.maps.Map(mapDivRef.current, {
       center: { lat: 44.5, lng: -69.5 },
       zoom: 7,
-      mapId: "lifeflight_map",
       styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
       disableDefaultUI: true,
       zoomControl: true,
@@ -452,9 +455,11 @@ export default function App() {
     if (!valid) return;
 
     const mkr = (position, fillColor, strokeColor) => {
-      const el = document.createElement("div");
-      el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${fillColor};border:2px solid ${strokeColor};`;
-      const m = new window.google.maps.marker.AdvancedMarkerElement({ position, map: mapInstanceRef.current, content: el });
+      const m = new window.google.maps.Marker({
+        position, map: mapInstanceRef.current,
+        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 9,
+          fillColor, fillOpacity: 1, strokeColor, strokeWeight: 2 },
+      });
       markersRef.current.push(m);
     };
     mkr({ lat: base.lat, lng: base.lng }, "#2e5a72", "#4a8aaa");
