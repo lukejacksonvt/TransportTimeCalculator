@@ -106,6 +106,7 @@ function isDarkHour() {
 }
 const BEDSIDE_MIN = 40; // per stop
 const BEDSIDE_TOTAL = 80; // both bedsides combined
+const CMMC_STOP_MIN = 15; // blood/narcotics dropoff at CMMC (Rodman only)
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 3958.8;
@@ -155,7 +156,7 @@ function calcLegs(base, sending, receiving, mode) {
   const t4 = leg4 ? timeFn(leg4) : null;
 
   const transit = t1 + t2 + t3 + (t4 || 0);
-  const total = transit + BEDSIDE_TOTAL;
+  const total = transit + BEDSIDE_TOTAL + (base.restockId ? CMMC_STOP_MIN : 0);
 
   return {
     legs: [
@@ -204,7 +205,7 @@ export default function App() {
       miles: apiLegs[i] ? Math.round(apiLegs[i].distance.value / 1609.34) : leg.miles,
     }));
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
-    return { ...haverResult, legs: updatedLegs, transit, total: transit + BEDSIDE_TOTAL };
+    return { ...haverResult, legs: updatedLegs, transit, total: transit + BEDSIDE_TOTAL + (base.restockId ? CMMC_STOP_MIN : 0) };
   })();
   const mapDivRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -841,7 +842,7 @@ export default function App() {
                 <div className={`total-box highlight${mode === "air" ? " air" : ""}`}>
                   <div className={`total-label ${mode === "air" ? "green" : "gold"}`}>Total Mission</div>
                   <div className="total-value">{formatTime(result.total)}</div>
-                  <div className="total-breakdown">Transit + 80 min bedside</div>
+                  <div className="total-breakdown">Transit + 80 min bedside{isRodman ? " + 15 min CMMC" : ""}</div>
                 </div>
               </div>
 
