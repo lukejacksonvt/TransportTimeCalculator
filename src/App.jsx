@@ -391,6 +391,7 @@ function HospitalSelect({ value, onChange, placeholder, exclude, pinnedIds }) {
 
 export default function App() {
   const [baseId, setBaseId] = useState("");
+  const [crewBaseId, setCrewBaseId] = useState("");
   const [sendingId, setSendingId] = useState("");
   const [receivingId, setReceivingId] = useState("");
   const [mode, setMode] = useState("ground");
@@ -436,27 +437,17 @@ export default function App() {
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
     return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
   })();
-  const nearestBase = (() => {
-    if (baseId !== "current" || !currentPos) return null;
-    return BASES.reduce((best, b) => {
-      const d = haversine(currentPos.lat, currentPos.lng, b.lat, b.lng);
-      return !best || d < best.d ? { b, d } : best;
-    }, null)?.b ?? null;
-  })();
-
   const shiftInfo = (() => {
-    if (!baseId) return null;
-    const shiftBaseId = baseId === "current" ? nearestBase?.id : baseId;
+    const shiftBaseId = baseId === "current" ? crewBaseId : baseId;
     if (!shiftBaseId) return null;
     const active = getActiveShift(shiftBaseId, now);
-    const inferredName = baseId === "current" ? nearestBase?.name : null;
-    if (!active) return { status: "none", inferredName };
-    if (!result) return { status: "idle", label: active.label, inferredName };
+    if (!active) return { status: "none" };
+    if (!result) return { status: "idle", label: active.label };
     const returnTime = new Date(now.getTime() + result.total * 60 * 1000);
     const gracePeriodEnd = new Date(active.end.getTime() + 2 * 60 * 60 * 1000);
     const rStr = t => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
     const status = returnTime <= active.end ? "green" : returnTime <= gracePeriodEnd ? "yellow" : "red";
-    return { status, label: active.label, returnStr: rStr(returnTime), inferredName };
+    return { status, label: active.label, returnStr: rStr(returnTime) };
   })();
 
   const mapDivRef = useRef(null);
@@ -1275,7 +1266,7 @@ export default function App() {
             <div className="field">
               <div className="sec-label">Originating Base</div>
               <div className="sel-wrap">
-                <select value={baseId} onChange={e => setBaseId(e.target.value)}>
+                <select value={baseId} onChange={e => { setBaseId(e.target.value); setCrewBaseId(""); }}>
                   <option value="">— Select base —</option>
                   <option value="current">{locating ? "Locating..." : "Current Location (GPS)"}</option>
                   {BASES.map(b => (
@@ -1284,6 +1275,20 @@ export default function App() {
                 </select>
               </div>
             </div>
+
+            {baseId === "current" && (
+              <div className="field">
+                <div className="sec-label">Assigned Base (for shift)</div>
+                <div className="sel-wrap">
+                  <select value={crewBaseId} onChange={e => setCrewBaseId(e.target.value)}>
+                    <option value="">— Select your base —</option>
+                    {BASES.map(b => (
+                      <option key={b.id} value={b.id}>{b.name} ({b.city})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
             <div className="field">
               <div className="sec-label">Sending Hospital</div>
@@ -1325,9 +1330,6 @@ export default function App() {
                   {shiftInfo.status === "none"
                     ? "No active shift"
                     : `Shift ${shiftInfo.label}`}
-                  {shiftInfo.inferredName && (
-                    <span style={{ opacity: 0.7, marginLeft: 6 }}>· {shiftInfo.inferredName}</span>
-                  )}
                 </span>
               </div>
               {shiftInfo.returnStr && (
