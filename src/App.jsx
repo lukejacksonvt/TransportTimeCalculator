@@ -1,27 +1,31 @@
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { GoogleMap, useJsApiLoader, Marker, Polyline } from "@react-google-maps/api";
 
 const HOSPITALS = [
-  { id: "mgh",    name: "Maine General – Augusta",         city: "Augusta",      lat: 44.3106, lng: -69.7795 },
-  { id: "mmmc",   name: "Maine Medical Center",            city: "Portland",     lat: 43.6591, lng: -70.2568 },
-  { id: "emmc",   name: "Eastern Maine Medical Center",    city: "Bangor",       lat: 44.8012, lng: -68.7778 },
-  { id: "cmmc",   name: "Central Maine Medical Center",    city: "Lewiston",     lat: 44.0996, lng: -70.2148 },
-  { id: "nfh",    name: "Northern Light – Farmington",     city: "Farmington",   lat: 44.6700, lng: -70.1520 },
-  { id: "wbh",    name: "Northern Light – Blue Hill",      city: "Blue Hill",    lat: 44.4066, lng: -68.5930 },
-  { id: "ych",    name: "York Hospital",                   city: "York",         lat: 43.1690, lng: -70.6470 },
-  { id: "mh",     name: "Mercy Hospital",                  city: "Portland",     lat: 43.6512, lng: -70.2602 },
-  { id: "smhc",   name: "Southern Maine Health Care",      city: "Biddeford",   lat: 43.4887, lng: -70.4534 },
-  { id: "pen",    name: "Pen Bay Medical Center",          city: "Rockport",     lat: 44.1860, lng: -69.1060 },
-  { id: "scdh",   name: "Sebasticook Valley Health",       city: "Pittsfield",   lat: 44.7787, lng: -69.3817 },
-  { id: "aro",    name: "Aroostook Medical Center",        city: "Presque Isle", lat: 46.6814, lng: -68.0157 },
-  { id: "calais", name: "Calais Regional Hospital",        city: "Calais",       lat: 45.1887, lng: -67.2775 },
-  { id: "mch",    name: "Miles & St. Rose – Damariscotta", city: "Damariscotta", lat: 44.0350, lng: -69.5145 },
-  { id: "iph",    name: "Island Medical Center",           city: "Vinalhaven",   lat: 44.0521, lng: -68.8270 },
-  { id: "dcmh",   name: "Down East Community Hospital",    city: "Machias",      lat: 44.7166, lng: -67.4637 },
-  { id: "smh",    name: "Stephens Memorial Hospital",      city: "Norway",       lat: 44.2090, lng: -70.5370 },
-  { id: "brig",   name: "Bridgton Hospital",               city: "Bridgton",     lat: 44.0560, lng: -70.7130 },
-  { id: "stmary", name: "St. Mary's Regional Medical Center", city: "Lewiston",  lat: 44.1015, lng: -70.2130 },
-  { id: "mhnc",   name: "Memorial Hospital",               city: "North Conway", lat: 44.0540, lng: -71.1270 },
-  { id: "rfgh",   name: "Redington-Fairview General Hospital", city: "Skowhegan", lat: 44.7652, lng: -69.7195 },
+  { id: "aro",    name: "Aroostook Medical Center",            city: "Presque Isle", lat: 46.6814, lng: -68.0157 },
+  { id: "brig",   name: "Bridgton Hospital",                   city: "Bridgton",     lat: 44.0560, lng: -70.7130 },
+  { id: "calais", name: "Calais Regional Hospital",            city: "Calais",       lat: 45.1887, lng: -67.2775 },
+  { id: "cmmc",   name: "Central Maine Medical Center",        city: "Lewiston",     lat: 44.0996, lng: -70.2148 },
+  { id: "dcmh",   name: "Down East Community Hospital",        city: "Machias",      lat: 44.7166, lng: -67.4637 },
+  { id: "emmc",   name: "Eastern Maine Medical Center",        city: "Bangor",       lat: 44.8012, lng: -68.7778 },
+  { id: "nfh",    name: "Franklin Memorial Hospital",          city: "Farmington",   lat: 44.6700, lng: -70.1520 },
+  { id: "iph",    name: "Island Medical Center",               city: "Vinalhaven",   lat: 44.0521, lng: -68.8270 },
+  { id: "mgh",    name: "Maine General – Augusta",             city: "Augusta",      lat: 44.3106, lng: -69.7795 },
+  { id: "mmmc",   name: "Maine Medical Center",                city: "Portland",     lat: 43.6591, lng: -70.2568 },
+  { id: "smhc",   name: "Maine Medical Center – Biddeford",   city: "Biddeford",    lat: 43.4887, lng: -70.4534 },
+  { id: "mhnc",   name: "Memorial Hospital",                   city: "North Conway", lat: 44.0540, lng: -71.1270 },
+  { id: "mh",     name: "Mercy Hospital",                      city: "Portland",     lat: 43.6512, lng: -70.2602 },
+  { id: "mid",    name: "Midcoast Medical Center",             city: "Brunswick",    lat: 43.9008, lng: -69.9653 },
+  { id: "mch",    name: "Miles & St. Rose – Damariscotta",    city: "Damariscotta", lat: 44.0350, lng: -69.5145 },
+  { id: "wbh",    name: "Northern Light – Blue Hill",          city: "Blue Hill",    lat: 44.4066, lng: -68.5930 },
+  { id: "pen",    name: "Pen Bay Medical Center",              city: "Rockport",     lat: 44.1860, lng: -69.1060 },
+  { id: "rfgh",   name: "Redington-Fairview General Hospital", city: "Skowhegan",   lat: 44.7652, lng: -69.7195 },
+  { id: "rum",    name: "Rumford Hospital",                    city: "Rumford",      lat: 44.5545, lng: -70.5484 },
+  { id: "scdh",   name: "Sebasticook Valley Health",           city: "Pittsfield",   lat: 44.7787, lng: -69.3817 },
+  { id: "stmary", name: "St. Mary's Regional Medical Center",  city: "Lewiston",    lat: 44.1015, lng: -70.2130 },
+  { id: "smh",    name: "Stephens Memorial Hospital",          city: "Norway",       lat: 44.2090, lng: -70.5370 },
+  { id: "wcgh",   name: "Waldo County General Hospital",       city: "Belfast",      lat: 44.4273, lng: -69.0069 },
+  { id: "ych",    name: "York Hospital",                       city: "York",         lat: 43.1690, lng: -70.6470 },
 ];
 
 const BASES = [
@@ -46,6 +50,35 @@ const BASES = [
 ];
 
 const CMMC_COORDS = { lat: 44.0996, lng: -70.2148 };
+
+const MAP_STYLES_LIGHT = [
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#e8eff6" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#d0dce8" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#b8d4e8" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#4a6a8a" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
+];
+
+const MAP_STYLES_DARK = [
+  { elementType: "geometry", stylers: [{ color: "#0a1520" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#0a1520" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#5a8aaa" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#7aaabb" }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#182e3e" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#0d1e2c" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#1a3a50" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#060d14" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#1a3a50" }] },
+];
+
+function isDarkHour() {
+  const h = new Date().getHours();
+  return h >= 20 || h < 6;
+}
 const BEDSIDE_MIN = 40; // per stop
 const BEDSIDE_TOTAL = 80; // both bedsides combined
 
@@ -132,14 +165,47 @@ export default function App() {
 
   const isRodman = base?.restockId != null;
 
+  const [isDark, setIsDark] = useState(isDarkHour);
+
+  useEffect(() => {
+    document.body.dataset.theme = isDark ? "dark" : "light";
+  }, [isDark]);
+
+  useEffect(() => {
+    const id = setInterval(() => setIsDark(isDarkHour()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
+  });
+
+  const mapRef = useRef(null);
+  const onMapLoad = useCallback((map) => { mapRef.current = map; }, []);
+
+  const routePoints = valid ? [
+    { lat: base.lat, lng: base.lng },
+    { lat: sending.lat, lng: sending.lng },
+    { lat: receiving.lat, lng: receiving.lng },
+    ...(base.restockId ? [CMMC_COORDS] : []),
+    { lat: base.lat, lng: base.lng },
+  ] : [];
+
+  useEffect(() => {
+    if (!mapRef.current || !valid || !window.google) return;
+    const bounds = new window.google.maps.LatLngBounds();
+    routePoints.forEach(pt => bounds.extend(pt));
+    mapRef.current.fitBounds(bounds, 60);
+  }, [baseId, sendingId, receivingId]);
+
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;800&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-          background: #070d14;
-          color: #b8ccd8;
+          background: #f0f4f8;
+          color: #2a4060;
           font-family: 'Barlow Condensed', sans-serif;
           min-height: 100vh;
           display: flex;
@@ -153,13 +219,13 @@ export default function App() {
         .header { margin-bottom: 24px; }
         .header-row { display: flex; align-items: center; gap: 12px; }
         .sol { width: 36px; height: 36px; }
-        .title { font-size: 24px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #deeaf2; line-height: 1; }
-        .sub { font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 0.18em; color: #2e5a72; margin-top: 5px; }
+        .title { font-size: 24px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #1a2d40; line-height: 1; }
+        .sub { font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 0.18em; color: #8aaac4; margin-top: 5px; }
 
         /* CARD */
         .card {
-          background: #0b1520;
-          border: 1px solid #152434;
+          background: #ffffff;
+          border: 1px solid #dde6ef;
           border-radius: 4px;
           padding: 22px;
           position: relative;
@@ -169,7 +235,7 @@ export default function App() {
           position: absolute;
           top: 0; left: 0;
           width: 3px; height: 100%;
-          background: linear-gradient(to bottom, #d4a820, #1e7a48);
+          background: linear-gradient(to bottom, #c49a00, #1a7040);
           border-radius: 4px 0 0 4px;
         }
 
@@ -179,7 +245,7 @@ export default function App() {
           font-size: 9px;
           letter-spacing: 0.28em;
           text-transform: uppercase;
-          color: #2e5a72;
+          color: #8aaac4;
           margin-bottom: 8px;
         }
 
@@ -189,9 +255,9 @@ export default function App() {
         .sel-wrap { position: relative; }
         select {
           width: 100%;
-          background: #060f18;
-          border: 1px solid #152434;
-          color: #b8ccd8;
+          background: #f8fafc;
+          border: 1px solid #cddbe8;
+          color: #2a4060;
           font-family: 'Barlow Condensed', sans-serif;
           font-size: 15px;
           padding: 9px 34px 9px 12px;
@@ -201,14 +267,14 @@ export default function App() {
           outline: none;
           transition: border-color 0.18s;
         }
-        select:focus { border-color: #d4a820; }
-        select option { background: #0b1520; }
+        select:focus { border-color: #c49a00; }
+        select option { background: #ffffff; }
         .sel-wrap::after {
           content: '▾';
           position: absolute;
           right: 10px; top: 50%;
           transform: translateY(-50%);
-          color: #2e5a72;
+          color: #8aaac4;
           pointer-events: none;
           font-size: 13px;
         }
@@ -217,9 +283,9 @@ export default function App() {
         .mode-row { display: flex; gap: 0; margin-top: 14px; }
         .mode-btn {
           flex: 1;
-          background: #060f18;
-          border: 1px solid #152434;
-          color: #2e5a72;
+          background: #f8fafc;
+          border: 1px solid #cddbe8;
+          color: #8aaac4;
           font-family: 'Barlow Condensed', sans-serif;
           font-size: 13px;
           font-weight: 600;
@@ -231,9 +297,9 @@ export default function App() {
         }
         .mode-btn:first-child { border-radius: 2px 0 0 2px; }
         .mode-btn:last-child { border-radius: 0 2px 2px 0; border-left: none; }
-        .mode-btn.active.ground { background: #1a1400; border-color: #d4a820; color: #d4a820; }
-        .mode-btn.active.air { background: #001810; border-color: #1e7a48; color: #1e7a48; }
-        .mode-btn:not(.active):hover { border-color: #2a4a60; color: #5a8a9a; }
+        .mode-btn.active.ground { background: #fffbeb; border-color: #c49a00; color: #a07800; }
+        .mode-btn.active.air { background: #f0fdf4; border-color: #1a7040; color: #1a7040; }
+        .mode-btn:not(.active):hover { border-color: #b0c8e0; color: #4a6a8a; }
 
         /* DIVIDER */
         .divider {
@@ -242,10 +308,10 @@ export default function App() {
           font-family: 'Share Tech Mono', monospace;
           font-size: 9px;
           letter-spacing: 0.22em;
-          color: #1e3a50;
+          color: #b0c8e0;
         }
         .divider::before, .divider::after {
-          content: ''; flex: 1; height: 1px; background: #0d2030;
+          content: ''; flex: 1; height: 1px; background: #e8eff6;
         }
 
         /* MISSION PROFILE */
@@ -274,17 +340,17 @@ export default function App() {
         .leg-dot {
           width: 9px; height: 9px;
           border-radius: 50%;
-          border: 2px solid #d4a820;
-          background: #070d14;
+          border: 2px solid #c49a00;
+          background: #f0f4f8;
           flex-shrink: 0;
           z-index: 1;
         }
-        .leg-dot.green { border-color: #1e7a48; }
-        .leg-dot.dim { border-color: #1e3a50; }
+        .leg-dot.green { border-color: #1a7040; }
+        .leg-dot.dim { border-color: #b0c8e0; }
         .leg-line {
           flex: 1;
           width: 1px;
-          background: #0d2030;
+          background: #e8eff6;
           margin: 2px 0;
         }
         .leg-content {
@@ -294,19 +360,19 @@ export default function App() {
         .leg-route {
           font-size: 14px;
           font-weight: 600;
-          color: #8aacbe;
+          color: #2a4060;
           letter-spacing: 0.04em;
         }
         .leg-meta {
           font-family: 'Share Tech Mono', monospace;
           font-size: 10px;
-          color: #2e5a72;
+          color: #8aaac4;
           margin-top: 2px;
         }
         .leg-time {
           font-size: 18px;
           font-weight: 700;
-          color: #deeaf2;
+          color: #1a2d40;
           margin-top: 1px;
         }
 
@@ -327,23 +393,23 @@ export default function App() {
         .bedside-dot {
           width: 13px; height: 13px;
           border-radius: 2px;
-          background: #1a1a0a;
-          border: 2px solid #d4a820;
+          background: #fffbeb;
+          border: 2px solid #c49a00;
           flex-shrink: 0;
           z-index: 1;
           display: flex; align-items: center; justify-content: center;
           font-size: 7px;
-          color: #d4a820;
+          color: #a07800;
         }
         .bedside-dot.receiving {
-          background: #001810;
-          border-color: #1e7a48;
-          color: #1e7a48;
+          background: #f0fdf4;
+          border-color: #1a7040;
+          color: #1a7040;
         }
         .bedside-line {
           flex: 1;
           width: 1px;
-          background: #0d2030;
+          background: #e8eff6;
           margin: 2px 0;
         }
         .bedside-content {
@@ -354,20 +420,20 @@ export default function App() {
           font-size: 11px;
           font-family: 'Share Tech Mono', monospace;
           letter-spacing: 0.14em;
-          color: #d4a820;
+          color: #a07800;
           text-transform: uppercase;
         }
-        .bedside-label.receiving { color: #1e9a58; }
+        .bedside-label.receiving { color: #1a7040; }
         .bedside-name {
           font-size: 14px;
           font-weight: 600;
-          color: #7a9ab0;
+          color: #4a6a8a;
           margin-top: 1px;
         }
         .bedside-time {
           font-size: 18px;
           font-weight: 700;
-          color: #deeaf2;
+          color: #1a2d40;
           margin-top: 1px;
         }
 
@@ -376,14 +442,14 @@ export default function App() {
           display: inline-flex;
           align-items: center;
           gap: 5px;
-          background: #0a0f1a;
-          border: 1px solid #1e3a60;
+          background: #f0f8ff;
+          border: 1px solid #b0c8e0;
           border-radius: 2px;
           padding: 3px 8px;
           font-family: 'Share Tech Mono', monospace;
           font-size: 9px;
           letter-spacing: 0.18em;
-          color: #3a6080;
+          color: #6a8aaa;
           text-transform: uppercase;
           margin-top: 4px;
         }
@@ -396,51 +462,51 @@ export default function App() {
           gap: 10px;
         }
         .total-box {
-          background: #060f18;
-          border: 1px solid #152434;
+          background: #f8fafc;
+          border: 1px solid #dde6ef;
           border-radius: 3px;
           padding: 14px;
         }
         .total-box.highlight {
-          border-color: #d4a820;
-          background: #0e0e00;
+          border-color: #c49a00;
+          background: #fffbeb;
         }
         .total-box.highlight.air {
-          border-color: #1e7a48;
-          background: #001408;
+          border-color: #1a7040;
+          background: #f0fdf4;
         }
         .total-label {
           font-family: 'Share Tech Mono', monospace;
           font-size: 9px;
           letter-spacing: 0.22em;
           text-transform: uppercase;
-          color: #2e5a72;
+          color: #8aaac4;
           margin-bottom: 6px;
         }
-        .total-label.gold { color: #a07820; }
-        .total-label.green { color: #1a6a38; }
+        .total-label.gold { color: #a07800; }
+        .total-label.green { color: #1a7040; }
         .total-value {
           font-size: 38px;
           font-weight: 800;
           line-height: 1;
-          color: #deeaf2;
+          color: #1a2d40;
           letter-spacing: -0.01em;
         }
         .total-breakdown {
           font-family: 'Share Tech Mono', monospace;
           font-size: 10px;
-          color: #2e5a72;
+          color: #8aaac4;
           margin-top: 6px;
         }
 
         .hint {
           text-align: center;
-          color: #152434;
+          color: #b0c8e0;
           font-family: 'Share Tech Mono', monospace;
           font-size: 11px;
           letter-spacing: 0.14em;
           padding: 28px 0 8px;
-          border-top: 1px dashed #0d1e2c;
+          border-top: 1px dashed #dde6ef;
           margin-top: 18px;
         }
 
@@ -448,11 +514,60 @@ export default function App() {
           margin-top: 14px;
           font-family: 'Share Tech Mono', monospace;
           font-size: 9px;
-          color: #1a3040;
+          color: #9ab0c4;
           letter-spacing: 0.06em;
-          border-top: 1px solid #0a1820;
+          border-top: 1px solid #e8eff6;
           padding-top: 10px;
         }
+
+        /* THEME TRANSITIONS */
+        body, .card, select, .mode-btn, .total-box, .leg-dot, .bedside-dot {
+          transition: background 0.4s, color 0.4s, border-color 0.4s;
+        }
+
+        /* DARK THEME OVERRIDES */
+        body[data-theme="dark"] { background: #070d14; color: #b8ccd8; }
+        body[data-theme="dark"] .title { color: #deeaf2; }
+        body[data-theme="dark"] .sub { color: #2e5a72; }
+        body[data-theme="dark"] .card { background: #0b1520; border-color: #152434; }
+        body[data-theme="dark"] .card::before { background: linear-gradient(to bottom, #d4a820, #1e7a48); }
+        body[data-theme="dark"] .sec-label { color: #2e5a72; }
+        body[data-theme="dark"] select { background: #060f18; border-color: #152434; color: #b8ccd8; }
+        body[data-theme="dark"] select:focus { border-color: #d4a820; }
+        body[data-theme="dark"] select option { background: #0b1520; }
+        body[data-theme="dark"] .sel-wrap::after { color: #2e5a72; }
+        body[data-theme="dark"] .mode-btn { background: #060f18; border-color: #152434; color: #2e5a72; }
+        body[data-theme="dark"] .mode-btn.active.ground { background: #1a1400; border-color: #d4a820; color: #d4a820; }
+        body[data-theme="dark"] .mode-btn.active.air { background: #001810; border-color: #1e7a48; color: #1e7a48; }
+        body[data-theme="dark"] .mode-btn:not(.active):hover { border-color: #2a4a60; color: #5a8a9a; }
+        body[data-theme="dark"] .divider { color: #1e3a50; }
+        body[data-theme="dark"] .divider::before,
+        body[data-theme="dark"] .divider::after { background: #0d2030; }
+        body[data-theme="dark"] .leg-dot { border-color: #d4a820; background: #070d14; }
+        body[data-theme="dark"] .leg-dot.green { border-color: #1e7a48; }
+        body[data-theme="dark"] .leg-dot.dim { border-color: #1e3a50; }
+        body[data-theme="dark"] .leg-line { background: #0d2030; }
+        body[data-theme="dark"] .leg-route { color: #8aacbe; }
+        body[data-theme="dark"] .leg-meta { color: #2e5a72; }
+        body[data-theme="dark"] .leg-time { color: #deeaf2; }
+        body[data-theme="dark"] .bedside-dot { background: #1a1a0a; border-color: #d4a820; color: #d4a820; }
+        body[data-theme="dark"] .bedside-dot.receiving { background: #001810; border-color: #1e7a48; color: #1e7a48; }
+        body[data-theme="dark"] .bedside-line { background: #0d2030; }
+        body[data-theme="dark"] .bedside-label { color: #d4a820; }
+        body[data-theme="dark"] .bedside-label.receiving { color: #1e9a58; }
+        body[data-theme="dark"] .bedside-name { color: #7a9ab0; }
+        body[data-theme="dark"] .bedside-time { color: #deeaf2; }
+        body[data-theme="dark"] .restock-badge { background: #0a0f1a; border-color: #1e3a60; color: #3a6080; }
+        body[data-theme="dark"] .total-box { background: #060f18; border-color: #152434; }
+        body[data-theme="dark"] .total-box.highlight { border-color: #d4a820; background: #0e0e00; }
+        body[data-theme="dark"] .total-box.highlight.air { border-color: #1e7a48; background: #001408; }
+        body[data-theme="dark"] .total-label { color: #2e5a72; }
+        body[data-theme="dark"] .total-label.gold { color: #a07820; }
+        body[data-theme="dark"] .total-label.green { color: #1a6a38; }
+        body[data-theme="dark"] .total-value { color: #deeaf2; }
+        body[data-theme="dark"] .total-breakdown { color: #2e5a72; }
+        body[data-theme="dark"] .hint { color: #152434; border-top-color: #0d1e2c; }
+        body[data-theme="dark"] .disclaimer { color: #1a3040; border-top-color: #0a1820; }
       `}</style>
 
       <div className="wrap">
@@ -634,6 +749,37 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {result && isLoaded && (
+          <div style={{ marginTop: 16, borderRadius: 4, overflow: "hidden", border: "1px solid #152434" }}>
+            <GoogleMap
+              mapContainerStyle={{ width: "100%", height: 320 }}
+              options={{ styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT, disableDefaultUI: true, zoomControl: true, gestureHandling: "cooperative" }}
+              onLoad={onMapLoad}
+            >
+              <Polyline
+                path={routePoints}
+                options={{
+                  strokeColor: mode === "air" ? "#1e9a58" : "#d4a820",
+                  strokeOpacity: 0.85,
+                  strokeWeight: 2.5,
+                }}
+              />
+              <Marker
+                position={{ lat: base.lat, lng: base.lng }}
+                icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#2e5a72", fillOpacity: 1, strokeColor: "#4a8aaa", strokeWeight: 2 }}
+              />
+              <Marker
+                position={{ lat: sending.lat, lng: sending.lng }}
+                icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: "#d4a820", fillOpacity: 1, strokeColor: "#f0c840", strokeWeight: 2 }}
+              />
+              <Marker
+                position={{ lat: receiving.lat, lng: receiving.lng }}
+                icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: "#1e7a48", fillOpacity: 1, strokeColor: "#2eb868", strokeWeight: 2 }}
+              />
+            </GoogleMap>
+          </div>
+        )}
       </div>
     </>
   );
