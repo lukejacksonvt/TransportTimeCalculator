@@ -365,6 +365,7 @@ export default function App() {
   // --- all state up front ---
   const [isDark, setIsDark] = useState(isDarkHour);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [groundRoute, setGroundRoute] = useState(null);
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
@@ -487,6 +488,7 @@ export default function App() {
       zoomControl: true,
       gestureHandling: "cooperative",
     });
+    setMapReady(true);
   }, [isLoaded, result]);
 
   // Update map styles when theme changes
@@ -518,7 +520,7 @@ export default function App() {
       weatherLayerRef.current = layer;
     }
     map.overlayMapTypes.push(weatherLayerRef.current);
-  }, [weatherLayer, isLoaded]);
+  }, [weatherLayer, mapReady]);
 
   // Temperature labels on map
   useEffect(() => {
@@ -532,7 +534,7 @@ export default function App() {
     if (hospitalWeather[receiving.id] != null)
       labels.push(makeTempLabel({ lat: receiving.lat, lng: receiving.lng }, `${hospitalWeather[receiving.id]}°F`, "receiving", map));
     tempLabelsRef.current = labels;
-  }, [hospitalWeather, sendingId, receivingId, valid, isLoaded]);
+  }, [hospitalWeather, sendingId, receivingId, valid, mapReady]);
 
   // Update markers, polyline, and fitBounds when route changes
   useEffect(() => {
