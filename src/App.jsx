@@ -346,7 +346,7 @@ export default function App() {
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
   const [bedsideMin, setBedsideMin] = useState(40);
-  const [showWeather, setShowWeather] = useState(false);
+  const [weatherLayer, setWeatherLayer] = useState("precip");
 
   const fixedBase = BASES.find(b => b.id === baseId);
   const base = baseId === "current"
@@ -453,25 +453,31 @@ export default function App() {
     mapInstanceRef.current.setOptions({ styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT });
   }, [isDark]);
 
-  // Weather tile overlay toggle
+  // Weather tile overlay
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
-    if (showWeather) {
-      if (!weatherLayerRef.current) {
-        weatherLayerRef.current = new window.google.maps.ImageMapType({
-          getTileUrl: (coord, zoom) =>
-            `https://weather.googleapis.com/v1/mapTypes/US_PRECIPITATION_CURRENT/mapTiles/${zoom}/${coord.x}/${coord.y}?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}`,
-          tileSize: new window.google.maps.Size(256, 256),
-          opacity: 0.65,
-          name: "Weather",
-        });
-      }
-      map.overlayMapTypes.push(weatherLayerRef.current);
-    } else {
-      map.overlayMapTypes.clear();
+    map.overlayMapTypes.clear();
+    if (!weatherLayer) return;
+    const tileTypes = {
+      precip: "US_PRECIPITATION_CURRENT",
+      temp:   "US_TEMPERATURE_CURRENT",
+    };
+    const key = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+    const type = tileTypes[weatherLayer];
+    if (!weatherLayerRef.current || weatherLayerRef.current._type !== weatherLayer) {
+      const layer = new window.google.maps.ImageMapType({
+        getTileUrl: (coord, zoom) =>
+          `https://weather.googleapis.com/v1/mapTypes/${type}/mapTiles/${zoom}/${coord.x}/${coord.y}?key=${key}`,
+        tileSize: new window.google.maps.Size(256, 256),
+        opacity: 0.65,
+        name: weatherLayer,
+      });
+      layer._type = weatherLayer;
+      weatherLayerRef.current = layer;
     }
-  }, [showWeather, isLoaded]);
+    map.overlayMapTypes.push(weatherLayerRef.current);
+  }, [weatherLayer, isLoaded]);
 
   // Update markers, polyline, and fitBounds when route changes
   useEffect(() => {
@@ -978,28 +984,34 @@ export default function App() {
         body[data-theme="dark"] .hsel-city { color: #2e5a72; }
         body[data-theme="dark"] .hsel-option.active .hsel-city { color: #a07820; }
 
-        /* WEATHER TOGGLE */
+        /* WEATHER LAYER CONTROLS */
         .map-wrap { position: relative; margin-top: 16px; }
-        .weather-toggle {
+        .weather-controls {
           position: absolute;
           top: 8px; right: 8px;
           z-index: 10;
+          display: flex;
+        }
+        .weather-btn {
           background: rgba(255,255,255,0.92);
           border: 1px solid #cddbe8;
-          border-radius: 2px;
-          padding: 5px 10px;
+          padding: 5px 9px;
           font-family: 'Share Tech Mono', monospace;
           font-size: 9px;
-          letter-spacing: 0.18em;
+          letter-spacing: 0.16em;
           text-transform: uppercase;
-          color: #4a6a8a;
+          color: #6a8aaa;
           cursor: pointer;
           transition: all 0.18s;
         }
-        .weather-toggle:hover { border-color: #1a7040; color: #1a7040; }
-        .weather-toggle.active { background: rgba(240,253,244,0.95); border-color: #1a7040; color: #1a7040; }
-        body[data-theme="dark"] .weather-toggle { background: rgba(11,21,32,0.92); border-color: #152434; color: #5a8a9a; }
-        body[data-theme="dark"] .weather-toggle.active { background: rgba(0,24,16,0.92); border-color: #1e7a48; color: #1e9a58; }
+        .weather-btn:not(:last-child) { border-right: none; }
+        .weather-btn:first-child { border-radius: 2px 0 0 2px; }
+        .weather-btn:last-child  { border-radius: 0 2px 2px 0; }
+        .weather-btn.active { background: rgba(240,253,244,0.96); border-color: #1a7040; color: #1a7040; border-right: 1px solid #1a7040; }
+        .weather-btn.active + .weather-btn { border-left: none; }
+        .weather-btn:hover:not(.active) { color: #2a4060; border-color: #b0c8e0; }
+        body[data-theme="dark"] .weather-btn { background: rgba(11,21,32,0.92); border-color: #152434; color: #3a6080; }
+        body[data-theme="dark"] .weather-btn.active { background: rgba(0,24,16,0.92); border-color: #1e7a48; color: #1e9a58; }
 
         /* THEME TRANSITIONS */
         body, .card, select, .mode-btn, .total-box, .leg-dot, .bedside-dot {
@@ -1249,12 +1261,15 @@ export default function App() {
               style={{ borderRadius: 4, overflow: "hidden", height: 320,
                 border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
             />
-            <button
-              className={`weather-toggle${showWeather ? " active" : ""}`}
-              onClick={() => setShowWeather(w => !w)}
-            >
-              {showWeather ? "◉ Precip On" : "○ Precip"}
-            </button>
+            <div className="weather-controls">
+              {[["", "Off"], ["precip", "Precip"], ["temp", "Temp"]].map(([val, label]) => (
+                <button
+                  key={val}
+                  className={`weather-btn${weatherLayer === val ? " active" : ""}`}
+                  onClick={() => setWeatherLayer(val)}
+                >{label}</button>
+              ))}
+            </div>
           </div>
         )}
       </div>
