@@ -736,10 +736,12 @@ export default function App() {
         body[data-theme="dark"] .live-badge.no-traffic { background: #1a1400; border-color: #d4a820; color: #d4a820; }
 
         /* BEDSIDE PRESET SELECTOR */
+        .bedside-row {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 16px;
+        }
         .bedside-selector {
-          position: absolute;
-          top: 22px;
-          right: 22px;
           width: 162px;
         }
         .bedside-hint {
@@ -814,18 +816,20 @@ export default function App() {
         </div>
 
         <div className="card">
-          <div className="bedside-selector">
-            <div className="sec-label">Bedside Time</div>
-            <div className="sel-wrap">
-              <select value={bedsideMin} onChange={e => setBedsideMin(Number(e.target.value))}>
-                {BEDSIDE_PRESETS.map(p => (
-                  <option key={p.min} value={p.min}>{p.label}</option>
-                ))}
-              </select>
+          <div className="bedside-row">
+            <div className="bedside-selector">
+              <div className="sec-label">Bedside Time</div>
+              <div className="sel-wrap">
+                <select value={bedsideMin} onChange={e => setBedsideMin(Number(e.target.value))}>
+                  {BEDSIDE_PRESETS.map(p => (
+                    <option key={p.min} value={p.min}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+              {bedsideMin === 60 && (
+                <div className="bedside-hint">ECMO · Balloon · Impella · Isolette</div>
+              )}
             </div>
-            {bedsideMin === 60 && (
-              <div className="bedside-hint">ECMO · Balloon · Impella · Isolette</div>
-            )}
           </div>
           <div className="fields">
             <div className="field">
