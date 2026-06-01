@@ -213,7 +213,8 @@ export default function App() {
 
   useEffect(() => {
     setOptions({ apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY, version: "weekly" });
-    importLibrary("maps").then(() => setIsLoaded(true));
+    Promise.all([importLibrary("maps"), importLibrary("routes")])
+      .then(() => setIsLoaded(true));
   }, []);
 
   // Init map when div mounts and API is ready
