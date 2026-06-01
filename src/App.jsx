@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 
 const HOSPITALS = [
@@ -159,8 +159,40 @@ export default function App() {
   const sending = HOSPITALS.find(h => h.id === sendingId);
   const receiving = HOSPITALS.find(h => h.id === receivingId);
 
-  const valid = base && sending && receiving && sendingId !== receivingId;
+  // --- all state up front ---
+  const [isDark, setIsDark] = useState(isDarkHour);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [groundRoute, setGroundRoute] = useState(null);
+
+  // --- derived values ---
+  const valid = base && sending && receiving && sendingId !== receivingId;
+  const isRodman = base?.restockId != null;
+
+  const haverResult = valid ? calcLegs(base, sending, receiving, mode) : null;
+  const result = (() => {
+    if (!haverResult || mode !== "ground" || !groundRoute) return haverResult;
+    const apiLegs = groundRoute.routes[0].legs;
+    const updatedLegs = haverResult.legs.map((leg, i) => ({
+      ...leg,
+      time: apiLegs[i] ? Math.round(apiLegs[i].duration.value / 60) : leg.time,
+      miles: apiLegs[i] ? Math.round(apiLegs[i].distance.value / 1609.34) : leg.miles,
+    }));
+    const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
+    return { ...haverResult, legs: updatedLegs, transit, total: transit + BEDSIDE_TOTAL };
+  })();
+  const mapDivRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
+  const polylineRef = useRef(null);
+
+  useEffect(() => {
+    document.body.dataset.theme = isDark ? "dark" : "light";
+  }, [isDark]);
+
+  useEffect(() => {
+    const id = setInterval(() => setIsDark(isDarkHour()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!valid || !isLoaded || mode !== "ground") { setGroundRoute(null); return; }
@@ -178,41 +210,6 @@ export default function App() {
       optimizeWaypoints: false,
     }, (res, status) => setGroundRoute(status === "OK" ? res : null));
   }, [baseId, sendingId, receivingId, mode, isLoaded]);
-
-  const result = useMemo(() => {
-    if (!valid) return null;
-    const base_result = calcLegs(base, sending, receiving, mode);
-    if (mode === "ground" && groundRoute) {
-      const apiLegs = groundRoute.routes[0].legs;
-      const updatedLegs = base_result.legs.map((leg, i) => ({
-        ...leg,
-        time: apiLegs[i] ? Math.round(apiLegs[i].duration.value / 60) : leg.time,
-        miles: apiLegs[i] ? Math.round(apiLegs[i].distance.value / 1609.34) : leg.miles,
-      }));
-      const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
-      return { ...base_result, legs: updatedLegs, transit, total: transit + BEDSIDE_TOTAL };
-    }
-    return base_result;
-  }, [valid, baseId, sendingId, receivingId, mode, groundRoute]);
-
-  const isRodman = base?.restockId != null;
-
-  const [isDark, setIsDark] = useState(isDarkHour);
-
-  useEffect(() => {
-    document.body.dataset.theme = isDark ? "dark" : "light";
-  }, [isDark]);
-
-  useEffect(() => {
-    const id = setInterval(() => setIsDark(isDarkHour()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  const [isLoaded, setIsLoaded] = useState(false);
-  const mapDivRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markersRef = useRef([]);
-  const polylineRef = useRef(null);
 
   useEffect(() => {
     const loader = new Loader({
