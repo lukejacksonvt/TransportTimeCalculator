@@ -207,13 +207,10 @@ async function computeRoute(origin, waypoints, destination) {
       destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
       intermediates: waypoints.map(wp => ({ location: { latLng: { latitude: wp.lat, longitude: wp.lng } } })),
       travelMode: "DRIVE",
+      departureTime: new Date().toISOString(),
     }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    console.error("Routes API error:", res.status, err?.error?.message ?? JSON.stringify(err));
-    return null;
-  }
+  if (!res.ok) return null;
   const data = await res.json();
   return data?.routes?.[0] ?? null;
 }
