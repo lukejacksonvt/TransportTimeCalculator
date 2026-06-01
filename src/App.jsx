@@ -863,7 +863,7 @@ export default function App() {
               </div>
 
               <div className="disclaimer">
-                ⚠ Ground: est. road factor 1.35× avg 55 mph · Air: straight-line 150 kts + 10 min ops · Estimates only — not for clinical decision-making
+                ⚠ Ground: road routing via Google Maps · Air: straight-line 150 kts + 10 min ops · Estimates only — not for clinical decision-making
               </div>
             </div>
           ) : (
