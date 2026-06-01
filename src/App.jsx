@@ -184,6 +184,7 @@ export default function App() {
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const polylineRef = useRef(null);
+  const directionsServiceRef = useRef(null);
 
   useEffect(() => {
     document.body.dataset.theme = isDark ? "dark" : "light";
@@ -195,8 +196,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!valid || !isLoaded || mode !== "ground") { setGroundRoute(null); return; }
-    const svc = new window.google.maps.DirectionsService();
+    if (!valid || !isLoaded || mode !== "ground" || !directionsServiceRef.current) { setGroundRoute(null); return; }
+    const svc = directionsServiceRef.current;
     const waypoints = [
       { location: { lat: sending.lat, lng: sending.lng }, stopover: true },
       { location: { lat: receiving.lat, lng: receiving.lng }, stopover: true },
@@ -206,7 +207,7 @@ export default function App() {
       origin: { lat: base.lat, lng: base.lng },
       destination: { lat: base.lat, lng: base.lng },
       waypoints,
-      travelMode: window.google.maps.TravelMode.DRIVING,
+      travelMode: "DRIVING",
       optimizeWaypoints: false,
     }, (res, status) => setGroundRoute(status === "OK" ? res : null));
   }, [baseId, sendingId, receivingId, mode, isLoaded]);
@@ -214,7 +215,10 @@ export default function App() {
   useEffect(() => {
     setOptions({ apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY, version: "weekly" });
     Promise.all([importLibrary("maps"), importLibrary("routes")])
-      .then(() => setIsLoaded(true));
+      .then(([, routesLib]) => {
+        directionsServiceRef.current = new routesLib.DirectionsService();
+        setIsLoaded(true);
+      });
   }, []);
 
   // Init map when div mounts and API is ready
