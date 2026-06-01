@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 
 const HOSPITALS = [
   { id: "aro",    name: "Aroostook Medical Center",            city: "Presque Isle", lat: 46.6814, lng: -68.0157 },
@@ -196,12 +195,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    setOptions({ apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY, version: "weekly" });
-    Promise.all([importLibrary("maps"), importLibrary("routes")])
-      .then(([, { DirectionsService }]) => {
-        directionsServiceRef.current = new DirectionsService();
-        setIsLoaded(true);
-      });
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}&libraries=routes`;
+    script.async = true;
+    script.onload = () => {
+      directionsServiceRef.current = new window.google.maps.DirectionsService();
+      setIsLoaded(true);
+    };
+    document.head.appendChild(script);
   }, []);
 
   useEffect(() => {
@@ -215,9 +216,9 @@ export default function App() {
       origin: { lat: base.lat, lng: base.lng },
       destination: { lat: base.lat, lng: base.lng },
       waypoints,
-      travelMode: "DRIVING",
+      travelMode: window.google.maps.TravelMode.DRIVING,
       optimizeWaypoints: false,
-    }).then(res => setGroundRoute(res)).catch(() => setGroundRoute(null));
+    }, (res, status) => setGroundRoute(status === "OK" ? res : null));
   }, [baseId, sendingId, receivingId, mode, isLoaded]);
 
   // Init map when div mounts and API is ready
