@@ -1,62 +1,65 @@
 import { useState, useRef, useEffect } from "react";
 
 const HOSPITALS = [
-  { id: "aro",    name: "Aroostook Medical Center",            city: "Presque Isle", lat: 46.6814, lng: -68.0157 },
-  { id: "avh",    name: "Androscoggin Valley Hospital",        city: "Berlin",       lat: 44.4778, lng: -71.1853 },
-  { id: "bidmc",  name: "Beth Israel Deaconess Medical Center",city: "Boston",       lat: 42.3385, lng: -71.1070 },
-  { id: "bch",    name: "Boston Children's Hospital",          city: "Boston",       lat: 42.3388, lng: -71.1073 },
-  { id: "brig",   name: "Bridgton Hospital",                   city: "Bridgton",     lat: 44.0560, lng: -70.7130 },
-  { id: "bwh",    name: "Brigham and Women's Hospital",        city: "Boston",       lat: 42.3359, lng: -71.1065 },
-  { id: "cadean", name: "C.A. Dean Hospital",                  city: "Greenville",   lat: 45.4608, lng: -69.5900 },
-  { id: "calais", name: "Calais Regional Hospital",            city: "Calais",       lat: 45.1887, lng: -67.2775 },
-  { id: "cary",   name: "Cary Medical Center",                 city: "Caribou",      lat: 46.8614, lng: -68.0089 },
-  { id: "cmc",    name: "Catholic Medical Center",             city: "Manchester",   lat: 42.9905, lng: -71.4548 },
-  { id: "cmmc",   name: "Central Maine Medical Center",        city: "Lewiston",     lat: 44.0996, lng: -70.2148 },
-  { id: "cheshire",name: "Cheshire Medical Center",            city: "Keene",        lat: 42.9381, lng: -72.2765 },
-  { id: "concord",name: "Concord Hospital",                    city: "Concord",      lat: 43.2135, lng: -71.5360 },
-  { id: "dhmc",   name: "Dartmouth-Hitchcock Medical Center",  city: "Lebanon",      lat: 43.6389, lng: -72.3198 },
-  { id: "dcmh",   name: "Down East Community Hospital",        city: "Machias",      lat: 44.7166, lng: -67.4637 },
-  { id: "emmc",   name: "Eastern Maine Medical Center",        city: "Bangor",       lat: 44.8012, lng: -68.7778 },
-  { id: "elliot", name: "Elliot Hospital",                     city: "Manchester",   lat: 42.9848, lng: -71.4482 },
-  { id: "nfh",    name: "Franklin Memorial Hospital",          city: "Farmington",   lat: 44.6700, lng: -70.1520 },
-  { id: "frisbie",name: "Frisbie Memorial Hospital",           city: "Rochester",    lat: 43.2987, lng: -70.9743 },
-  { id: "houlton",name: "Houlton Regional Hospital",           city: "Houlton",      lat: 46.1284, lng: -67.8393 },
-  { id: "lahey",  name: "Lahey Hospital & Medical Center",     city: "Burlington",   lat: 42.5073, lng: -71.2016 },
-  { id: "lrgh",   name: "Lakes Region General Hospital",       city: "Laconia",      lat: 43.5248, lng: -71.4695 },
-  { id: "littleton",name: "Littleton Regional Hospital",       city: "Littleton",    lat: 44.3036, lng: -71.7803 },
-  { id: "mgh",    name: "Maine General – Augusta",             city: "Augusta",      lat: 44.3106, lng: -69.7795 },
-  { id: "mgt",    name: "Maine General – Thayer",              city: "Waterville",   lat: 44.5516, lng: -69.6350 },
-  { id: "mmmc",   name: "Maine Medical Center",                city: "Portland",     lat: 43.6591, lng: -70.2568 },
-  { id: "smhc",   name: "Maine Medical Center – Biddeford",    city: "Biddeford",    lat: 43.4887, lng: -70.4534 },
-  { id: "mhs",    name: "MaineHealth – Sanford",               city: "Sanford",      lat: 43.4342, lng: -70.7483 },
-  { id: "mgh_ma", name: "Massachusetts General Hospital",      city: "Boston",       lat: 42.3629, lng: -71.0686 },
-  { id: "mayo",   name: "Mayo Regional Hospital",              city: "Dover-Foxcroft",lat: 45.1854, lng: -69.2335 },
-  { id: "mhnc",   name: "Memorial Hospital",                   city: "North Conway", lat: 44.0540, lng: -71.1270 },
-  { id: "mh",     name: "Mercy Hospital",                      city: "Portland",     lat: 43.6512, lng: -70.2602 },
-  { id: "mid",    name: "Midcoast Medical Center",             city: "Brunswick",    lat: 43.9008, lng: -69.9653 },
-  { id: "mch",    name: "Miles & St. Rose – Damariscotta",     city: "Damariscotta", lat: 44.0350, lng: -69.5145 },
-  { id: "millin", name: "Millinocket Regional Hospital",       city: "Millinocket",  lat: 45.6568, lng: -68.7106 },
-  { id: "mdi",    name: "Mount Desert Island Hospital",        city: "Bar Harbor",   lat: 44.3876, lng: -68.2033 },
-  { id: "wbh",    name: "Northern Light – Blue Hill",          city: "Blue Hill",    lat: 44.4066, lng: -68.5930 },
-  { id: "nlmch",  name: "Northern Light Maine Coast Hospital", city: "Ellsworth",    lat: 44.5435, lng: -68.4195 },
-  { id: "nlsj",   name: "Northern Light St. Joseph Hospital",  city: "Bangor",       lat: 44.8087, lng: -68.7794 },
-  { id: "pen",    name: "Pen Bay Medical Center",              city: "Rockport",     lat: 44.1860, lng: -69.1060 },
-  { id: "pvh",    name: "Penobscot Valley Hospital",           city: "Lincoln",      lat: 45.3622, lng: -68.4987 },
-  { id: "porth",  name: "Portsmouth Regional Hospital",        city: "Portsmouth",   lat: 43.0718, lng: -70.7626 },
-  { id: "rfgh",   name: "Redington-Fairview General Hospital", city: "Skowhegan",    lat: 44.7652, lng: -69.7195 },
-  { id: "rum",    name: "Rumford Hospital",                    city: "Rumford",      lat: 44.5545, lng: -70.5484 },
-  { id: "scdh",   name: "Sebasticook Valley Health",           city: "Pittsfield",   lat: 44.7787, lng: -69.3817 },
-  { id: "snhmc",  name: "Southern NH Medical Center",          city: "Nashua",       lat: 42.7654, lng: -71.4673 },
-  { id: "speare", name: "Speare Memorial Hospital",            city: "Plymouth",     lat: 43.7548, lng: -71.6887 },
-  { id: "stjnh",  name: "St. Joseph Hospital",                 city: "Nashua",       lat: 42.7559, lng: -71.4695 },
-  { id: "stmary", name: "St. Mary's Regional Medical Center",  city: "Lewiston",     lat: 44.1015, lng: -70.2130 },
-  { id: "smh",    name: "Stephens Memorial Hospital",          city: "Norway",       lat: 44.2090, lng: -70.5370 },
-  { id: "tufts",  name: "Tufts Medical Center",                city: "Boston",       lat: 42.3496, lng: -71.0633 },
-  { id: "valley", name: "Valley Regional Hospital",            city: "Claremont",    lat: 43.3773, lng: -72.3365 },
-  { id: "wcgh",   name: "Waldo County General Hospital",       city: "Belfast",      lat: 44.4273, lng: -69.0069 },
-  { id: "weeks",  name: "Weeks Medical Center",                city: "Lancaster",    lat: 44.4887, lng: -71.5695 },
-  { id: "wdh",    name: "Wentworth-Douglass Hospital",         city: "Dover",        lat: 43.1973, lng: -70.8734 },
-  { id: "ych",    name: "York Hospital",                       city: "York",         lat: 43.1690, lng: -70.6470 },
+  // Maine
+  { id: "aro",    state: "ME", name: "Aroostook Medical Center",            city: "Presque Isle",  lat: 46.6814, lng: -68.0157 },
+  { id: "brig",   state: "ME", name: "Bridgton Hospital",                   city: "Bridgton",      lat: 44.0560, lng: -70.7130 },
+  { id: "cadean", state: "ME", name: "C.A. Dean Hospital",                  city: "Greenville",    lat: 45.4608, lng: -69.5900 },
+  { id: "calais", state: "ME", name: "Calais Regional Hospital",            city: "Calais",        lat: 45.1887, lng: -67.2775 },
+  { id: "cary",   state: "ME", name: "Cary Medical Center",                 city: "Caribou",       lat: 46.8614, lng: -68.0089 },
+  { id: "cmmc",   state: "ME", name: "Central Maine Medical Center",        city: "Lewiston",      lat: 44.0996, lng: -70.2148 },
+  { id: "dcmh",   state: "ME", name: "Down East Community Hospital",        city: "Machias",       lat: 44.7166, lng: -67.4637 },
+  { id: "emmc",   state: "ME", name: "Eastern Maine Medical Center",        city: "Bangor",        lat: 44.8012, lng: -68.7778 },
+  { id: "nfh",    state: "ME", name: "Franklin Memorial Hospital",          city: "Farmington",    lat: 44.6700, lng: -70.1520 },
+  { id: "houlton",state: "ME", name: "Houlton Regional Hospital",           city: "Houlton",       lat: 46.1284, lng: -67.8393 },
+  { id: "mgh",    state: "ME", name: "Maine General – Augusta",             city: "Augusta",       lat: 44.3106, lng: -69.7795 },
+  { id: "mgt",    state: "ME", name: "Maine General – Thayer",              city: "Waterville",    lat: 44.5516, lng: -69.6350 },
+  { id: "mmmc",   state: "ME", name: "Maine Medical Center",                city: "Portland",      lat: 43.6591, lng: -70.2568 },
+  { id: "smhc",   state: "ME", name: "Maine Medical Center – Biddeford",    city: "Biddeford",     lat: 43.4887, lng: -70.4534 },
+  { id: "mhs",    state: "ME", name: "MaineHealth – Sanford",               city: "Sanford",       lat: 43.4342, lng: -70.7483 },
+  { id: "mayo",   state: "ME", name: "Mayo Regional Hospital",              city: "Dover-Foxcroft",lat: 45.1854, lng: -69.2335 },
+  { id: "mh",     state: "ME", name: "Mercy Hospital",                      city: "Portland",      lat: 43.6512, lng: -70.2602 },
+  { id: "mid",    state: "ME", name: "Midcoast Medical Center",             city: "Brunswick",     lat: 43.9008, lng: -69.9653 },
+  { id: "mch",    state: "ME", name: "Miles & St. Rose – Damariscotta",     city: "Damariscotta",  lat: 44.0350, lng: -69.5145 },
+  { id: "millin", state: "ME", name: "Millinocket Regional Hospital",       city: "Millinocket",   lat: 45.6568, lng: -68.7106 },
+  { id: "mdi",    state: "ME", name: "Mount Desert Island Hospital",        city: "Bar Harbor",    lat: 44.3876, lng: -68.2033 },
+  { id: "wbh",    state: "ME", name: "Northern Light – Blue Hill",          city: "Blue Hill",     lat: 44.4066, lng: -68.5930 },
+  { id: "nlmch",  state: "ME", name: "Northern Light Maine Coast Hospital", city: "Ellsworth",     lat: 44.5435, lng: -68.4195 },
+  { id: "nlsj",   state: "ME", name: "Northern Light St. Joseph Hospital",  city: "Bangor",        lat: 44.8087, lng: -68.7794 },
+  { id: "pen",    state: "ME", name: "Pen Bay Medical Center",              city: "Rockport",      lat: 44.1860, lng: -69.1060 },
+  { id: "pvh",    state: "ME", name: "Penobscot Valley Hospital",           city: "Lincoln",       lat: 45.3622, lng: -68.4987 },
+  { id: "rfgh",   state: "ME", name: "Redington-Fairview General Hospital", city: "Skowhegan",     lat: 44.7652, lng: -69.7195 },
+  { id: "rum",    state: "ME", name: "Rumford Hospital",                    city: "Rumford",       lat: 44.5545, lng: -70.5484 },
+  { id: "scdh",   state: "ME", name: "Sebasticook Valley Health",           city: "Pittsfield",    lat: 44.7787, lng: -69.3817 },
+  { id: "stmary", state: "ME", name: "St. Mary's Regional Medical Center",  city: "Lewiston",      lat: 44.1015, lng: -70.2130 },
+  { id: "smh",    state: "ME", name: "Stephens Memorial Hospital",          city: "Norway",        lat: 44.2090, lng: -70.5370 },
+  { id: "wcgh",   state: "ME", name: "Waldo County General Hospital",       city: "Belfast",       lat: 44.4273, lng: -69.0069 },
+  { id: "ych",    state: "ME", name: "York Hospital",                       city: "York",          lat: 43.1690, lng: -70.6470 },
+  // New Hampshire
+  { id: "avh",    state: "NH", name: "Androscoggin Valley Hospital",        city: "Berlin",        lat: 44.4778, lng: -71.1853 },
+  { id: "cmc",    state: "NH", name: "Catholic Medical Center",             city: "Manchester",    lat: 42.9905, lng: -71.4548 },
+  { id: "cheshire",state:"NH", name: "Cheshire Medical Center",             city: "Keene",         lat: 42.9381, lng: -72.2765 },
+  { id: "concord",state: "NH", name: "Concord Hospital",                    city: "Concord",       lat: 43.2135, lng: -71.5360 },
+  { id: "dhmc",   state: "NH", name: "Dartmouth-Hitchcock Medical Center",  city: "Lebanon",       lat: 43.6389, lng: -72.3198 },
+  { id: "elliot", state: "NH", name: "Elliot Hospital",                     city: "Manchester",    lat: 42.9848, lng: -71.4482 },
+  { id: "frisbie",state: "NH", name: "Frisbie Memorial Hospital",           city: "Rochester",     lat: 43.2987, lng: -70.9743 },
+  { id: "lrgh",   state: "NH", name: "Lakes Region General Hospital",       city: "Laconia",       lat: 43.5248, lng: -71.4695 },
+  { id: "littleton",state:"NH",name: "Littleton Regional Hospital",         city: "Littleton",     lat: 44.3036, lng: -71.7803 },
+  { id: "mhnc",   state: "NH", name: "Memorial Hospital",                   city: "North Conway",  lat: 44.0540, lng: -71.1270 },
+  { id: "porth",  state: "NH", name: "Portsmouth Regional Hospital",        city: "Portsmouth",    lat: 43.0718, lng: -70.7626 },
+  { id: "snhmc",  state: "NH", name: "Southern NH Medical Center",          city: "Nashua",        lat: 42.7654, lng: -71.4673 },
+  { id: "speare", state: "NH", name: "Speare Memorial Hospital",            city: "Plymouth",      lat: 43.7548, lng: -71.6887 },
+  { id: "stjnh",  state: "NH", name: "St. Joseph Hospital",                 city: "Nashua",        lat: 42.7559, lng: -71.4695 },
+  { id: "valley", state: "NH", name: "Valley Regional Hospital",            city: "Claremont",     lat: 43.3773, lng: -72.3365 },
+  { id: "weeks",  state: "NH", name: "Weeks Medical Center",                city: "Lancaster",     lat: 44.4887, lng: -71.5695 },
+  { id: "wdh",    state: "NH", name: "Wentworth-Douglass Hospital",         city: "Dover",         lat: 43.1973, lng: -70.8734 },
+  // Massachusetts
+  { id: "bidmc",  state: "MA", name: "Beth Israel Deaconess Medical Center",city: "Boston",        lat: 42.3385, lng: -71.1070 },
+  { id: "bch",    state: "MA", name: "Boston Children's Hospital",          city: "Boston",        lat: 42.3388, lng: -71.1073 },
+  { id: "bwh",    state: "MA", name: "Brigham and Women's Hospital",        city: "Boston",        lat: 42.3359, lng: -71.1065 },
+  { id: "lahey",  state: "MA", name: "Lahey Hospital & Medical Center",     city: "Burlington",    lat: 42.5073, lng: -71.2016 },
+  { id: "mgh_ma", state: "MA", name: "Massachusetts General Hospital",      city: "Boston",        lat: 42.3629, lng: -71.0686 },
+  { id: "tufts",  state: "MA", name: "Tufts Medical Center",                city: "Boston",        lat: 42.3496, lng: -71.0633 },
 ];
 
 const BASES = [
@@ -137,9 +140,13 @@ function isDarkHour() {
   const h = new Date().getHours();
   return h >= 20 || h < 6;
 }
-const BEDSIDE_MIN = 40; // per stop
-const BEDSIDE_TOTAL = 80; // both bedsides combined
 const CMMC_STOP_MIN = 15; // blood/narcotics dropoff at CMMC (Rodman only)
+
+const BEDSIDE_PRESETS = [
+  { label: "Quick — 20 min", min: 20 },
+  { label: "Standard — 40 min", min: 40 },
+  { label: "Long — 60 min", min: 60, hint: "ECMO · Balloon · Impella · Isolette" },
+];
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 3958.8;
@@ -167,6 +174,7 @@ function formatTime(mins) {
   const m = mins % 60;
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
+
 
 function calcLegs(base, sending, receiving, mode) {
   const timeFn = mode === "air" ? flightMin : groundMin;
@@ -209,6 +217,8 @@ function calcLegs(base, sending, receiving, mode) {
   };
 }
 
+const LOAD_TIME = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
 export default function App() {
   const [baseId, setBaseId] = useState("");
   const [sendingId, setSendingId] = useState("");
@@ -221,6 +231,8 @@ export default function App() {
   const [groundRoute, setGroundRoute] = useState(null);
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
+  const [bedsideMin, setBedsideMin] = useState(40);
+  const [trafficLive, setTrafficLive] = useState(false);
 
   const fixedBase = BASES.find(b => b.id === baseId);
   const base = baseId === "current"
@@ -232,18 +244,23 @@ export default function App() {
   // --- derived values ---
   const valid = base && sending && receiving && sendingId !== receivingId;
   const isRodman = base?.restockId != null;
+  const legMeta = mode === "ground" && groundRoute ? "live traffic" : "transit";
 
+  const bedsideTotal = bedsideMin * 2;
   const haverResult = valid ? calcLegs(base, sending, receiving, mode) : null;
   const result = (() => {
-    if (!haverResult || mode !== "ground" || !groundRoute) return haverResult;
+    if (!haverResult) return null;
+    if (mode !== "ground" || !groundRoute) {
+      return { ...haverResult, total: haverResult.transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
+    }
     const apiLegs = groundRoute.routes[0].legs;
     const updatedLegs = haverResult.legs.map((leg, i) => ({
       ...leg,
-      time: apiLegs[i] ? Math.round(apiLegs[i].duration.value / 60) : leg.time,
+      time: apiLegs[i] ? Math.round((apiLegs[i].duration_in_traffic?.value ?? apiLegs[i].duration.value) / 60) : leg.time,
       miles: apiLegs[i] ? Math.round(apiLegs[i].distance.value / 1609.34) : leg.miles,
     }));
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
-    return { ...haverResult, legs: updatedLegs, transit, total: transit + BEDSIDE_TOTAL + (base.restockId ? CMMC_STOP_MIN : 0) };
+    return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
   })();
   const mapDivRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -282,7 +299,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!valid || !isLoaded || mode !== "ground" || !directionsServiceRef.current) { setGroundRoute(null); return; }
+    if (!valid || !isLoaded || mode !== "ground" || !directionsServiceRef.current) { setGroundRoute(null); setTrafficLive(false); return; }
     const waypoints = [
       { location: { lat: sending.lat, lng: sending.lng }, stopover: true },
       { location: { lat: receiving.lat, lng: receiving.lng }, stopover: true },
@@ -294,7 +311,16 @@ export default function App() {
       waypoints,
       travelMode: window.google.maps.TravelMode.DRIVING,
       optimizeWaypoints: false,
-    }, (res, status) => setGroundRoute(status === "OK" ? res : null));
+      drivingOptions: { departureTime: new Date(), trafficModel: "bestguess" },
+    }, (res, status) => {
+      if (status === "OK") {
+        setGroundRoute(res);
+        setTrafficLive(res.routes[0]?.legs?.some(l => l.duration_in_traffic) ?? false);
+      } else {
+        setGroundRoute(null);
+        setTrafficLive(false);
+      }
+    });
   }, [baseId, sendingId, receivingId, mode, isLoaded]);
 
   // Init map when div mounts and API is ready
@@ -684,6 +710,47 @@ export default function App() {
           padding-top: 10px;
         }
 
+        /* LIVE TRAFFIC BADGE */
+        .live-status { margin-bottom: 14px; }
+        .live-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          border-radius: 2px;
+          padding: 3px 8px;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 9px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          background: #f0fdf4;
+          border: 1px solid #1a7040;
+          color: #1a7040;
+        }
+        .live-badge.no-traffic {
+          background: #fffbeb;
+          border-color: #c49a00;
+          color: #a07800;
+        }
+        body[data-theme="dark"] .live-badge { background: #001810; border-color: #1e7a48; color: #1e9a58; }
+        body[data-theme="dark"] .live-badge.no-traffic { background: #1a1400; border-color: #d4a820; color: #d4a820; }
+
+        /* BEDSIDE PRESET SELECTOR */
+        .bedside-selector {
+          position: absolute;
+          top: 22px;
+          right: 22px;
+          width: 162px;
+        }
+        .bedside-hint {
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 8px;
+          letter-spacing: 0.12em;
+          color: #8aaac4;
+          margin-top: 4px;
+          text-align: right;
+        }
+        body[data-theme="dark"] .bedside-hint { color: #2e5a72; }
+
         /* THEME TRANSITIONS */
         body, .card, select, .mode-btn, .total-box, .leg-dot, .bedside-dot {
           transition: background 0.4s, color 0.4s, border-color 0.4s;
@@ -740,12 +807,25 @@ export default function App() {
             <img src="/lifeflight-logo.svg" className="logo" alt="LifeFlight of Maine" />
             <div>
               <div className="title">Mission Time Calculator</div>
-              <div className="sub">Full Transport Profile</div>
+              <div className="sub">Full Transport Profile · {LOAD_TIME}</div>
             </div>
           </div>
         </div>
 
         <div className="card">
+          <div className="bedside-selector">
+            <div className="sec-label">Bedside Time</div>
+            <div className="sel-wrap">
+              <select value={bedsideMin} onChange={e => setBedsideMin(Number(e.target.value))}>
+                {BEDSIDE_PRESETS.map(p => (
+                  <option key={p.min} value={p.min}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            {bedsideMin === 60 && (
+              <div className="bedside-hint">ECMO · Balloon · Impella · Isolette</div>
+            )}
+          </div>
           <div className="fields">
             <div className="field">
               <div className="sec-label">Originating Base</div>
@@ -800,6 +880,14 @@ export default function App() {
             <div className="profile" key={`${baseId}-${sendingId}-${receivingId}-${mode}`}>
               <div className="divider">Mission Profile</div>
 
+              {mode === "ground" && groundRoute && (
+                <div className="live-status">
+                  <span className={`live-badge${trafficLive ? "" : " no-traffic"}`}>
+                    {trafficLive ? "⬤ Live Traffic" : "⚠ No Traffic Data"}
+                  </span>
+                </div>
+              )}
+
               <div className="legs">
                 {/* Leg 1: Base to Sending */}
                 <div className="leg">
@@ -809,7 +897,7 @@ export default function App() {
                   </div>
                   <div className="leg-content">
                     <div className="leg-route">{result.legs[0].label}</div>
-                    <div className="leg-meta">{result.legs[0].miles} mi · transit</div>
+                    <div className="leg-meta">{result.legs[0].miles} mi · {legMeta}</div>
                     <div className="leg-time">{formatTime(result.legs[0].time)}</div>
                   </div>
                 </div>
@@ -823,7 +911,7 @@ export default function App() {
                   <div className="bedside-content">
                     <div className="bedside-label">Bedside · Sending</div>
                     <div className="bedside-name">{sending.name}</div>
-                    <div className="bedside-time">{formatTime(BEDSIDE_MIN)}</div>
+                    <div className="bedside-time">{formatTime(bedsideMin)}</div>
                   </div>
                 </div>
 
@@ -835,7 +923,7 @@ export default function App() {
                   </div>
                   <div className="leg-content">
                     <div className="leg-route">{result.legs[1].label}</div>
-                    <div className="leg-meta">{result.legs[1].miles} mi · transit</div>
+                    <div className="leg-meta">{result.legs[1].miles} mi · {legMeta}</div>
                     <div className="leg-time">{formatTime(result.legs[1].time)}</div>
                   </div>
                 </div>
@@ -849,7 +937,7 @@ export default function App() {
                   <div className="bedside-content">
                     <div className="bedside-label receiving">Bedside · Receiving</div>
                     <div className="bedside-name">{receiving.name}</div>
-                    <div className="bedside-time">{formatTime(BEDSIDE_MIN)}</div>
+                    <div className="bedside-time">{formatTime(bedsideMin)}</div>
                   </div>
                 </div>
 
@@ -861,7 +949,7 @@ export default function App() {
                   </div>
                   <div className="leg-content">
                     <div className="leg-route">{result.legs[2].label}</div>
-                    <div className="leg-meta">{result.legs[2].miles} mi · transit</div>
+                    <div className="leg-meta">{result.legs[2].miles} mi · {legMeta}</div>
                     <div className="leg-time">{formatTime(result.legs[2].time)}</div>
                     {isRodman && <div className="restock-badge">⟳ Restock at CMMC</div>}
                   </div>
@@ -891,12 +979,12 @@ export default function App() {
                 <div className={`total-box highlight${mode === "air" ? " air" : ""}`}>
                   <div className={`total-label ${mode === "air" ? "green" : "gold"}`}>Total Mission</div>
                   <div className="total-value">{formatTime(result.total)}</div>
-                  <div className="total-breakdown">Transit + 80 min bedside{isRodman ? " + 15 min CMMC" : ""}</div>
+                  <div className="total-breakdown">Transit + {bedsideTotal} min bedside{isRodman ? " + 15 min CMMC" : ""}</div>
                 </div>
               </div>
 
               <div className="disclaimer">
-                ⚠ Ground: road routing via Google Maps · Air: straight-line 150 kts + 10 min ops · Estimates only — not for clinical decision-making
+                ⚠ Ground: live traffic via Google Maps Directions · Air: straight-line 150 kts + 10 min ops · Estimates only — not for clinical decision-making
               </div>
             </div>
           ) : (
