@@ -141,6 +141,7 @@ function isDarkHour() {
   return h >= 20 || h < 6;
 }
 const CMMC_STOP_MIN = 15; // blood/narcotics dropoff at CMMC (Rodman only)
+const BEDSIDE_TOTAL = 80;  // placeholder for calcLegs; overridden by bedsideMin state in component
 
 const BEDSIDE_PRESETS = [
   { label: "Quick — 20 min", min: 20 },
