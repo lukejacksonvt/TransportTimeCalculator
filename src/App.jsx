@@ -194,6 +194,29 @@ function decodePolyline(encoded) {
   return pts;
 }
 
+function makeTempLabel(position, text, className, map) {
+  const overlay = new window.google.maps.OverlayView();
+  let div;
+  overlay.onAdd = function () {
+    div = document.createElement("div");
+    div.className = `temp-label ${className}`;
+    div.textContent = text;
+    this.getPanes().overlayLayer.appendChild(div);
+  };
+  overlay.draw = function () {
+    const proj = this.getProjection();
+    if (!proj || !div) return;
+    const pt = proj.fromLatLngToDivPixel(new window.google.maps.LatLng(position.lat, position.lng));
+    if (pt) { div.style.left = pt.x + "px"; div.style.top = pt.y + "px"; }
+  };
+  overlay.onRemove = function () {
+    if (div?.parentNode) div.parentNode.removeChild(div);
+    div = null;
+  };
+  overlay.setMap(map);
+  return overlay;
+}
+
 async function computeRoute(origin, waypoints, destination) {
   const key = import.meta.env.VITE_GOOGLE_MAPS_KEY;
   const res = await fetch(`https://routes.googleapis.com/directions/v2:computeRoutes?key=${key}`, {
@@ -382,6 +405,7 @@ export default function App() {
   const markersRef = useRef([]);
   const polylineRef = useRef(null);
   const weatherLayerRef = useRef(null);
+  const tempLabelsRef = useRef([]);
 
   useEffect(() => {
     document.body.dataset.theme = isDark ? "dark" : "light";
@@ -495,6 +519,20 @@ export default function App() {
     }
     map.overlayMapTypes.push(weatherLayerRef.current);
   }, [weatherLayer, isLoaded]);
+
+  // Temperature labels on map
+  useEffect(() => {
+    tempLabelsRef.current.forEach(l => l.setMap(null));
+    tempLabelsRef.current = [];
+    if (!mapInstanceRef.current || !window.google || !valid) return;
+    const map = mapInstanceRef.current;
+    const labels = [];
+    if (hospitalWeather[sending.id] != null)
+      labels.push(makeTempLabel({ lat: sending.lat, lng: sending.lng }, `${hospitalWeather[sending.id]}°F`, "sending", map));
+    if (hospitalWeather[receiving.id] != null)
+      labels.push(makeTempLabel({ lat: receiving.lat, lng: receiving.lng }, `${hospitalWeather[receiving.id]}°F`, "receiving", map));
+    tempLabelsRef.current = labels;
+  }, [hospitalWeather, sendingId, receivingId, valid, isLoaded]);
 
   // Update markers, polyline, and fitBounds when route changes
   useEffect(() => {
@@ -770,16 +808,6 @@ export default function App() {
           color: #4a6a8a;
           margin-top: 1px;
         }
-        .bedside-wx {
-          font-family: 'Share Tech Mono', monospace;
-          font-size: 10px;
-          letter-spacing: 0.1em;
-          color: #a07800;
-          margin-top: 1px;
-        }
-        .bedside-wx.receiving { color: #1a7040; }
-        body[data-theme="dark"] .bedside-wx { color: #d4a820; }
-        body[data-theme="dark"] .bedside-wx.receiving { color: #1e9a58; }
         .bedside-time {
           font-size: 18px;
           font-weight: 700;
@@ -1011,6 +1039,27 @@ export default function App() {
         body[data-theme="dark"] .hsel-city { color: #2e5a72; }
         body[data-theme="dark"] .hsel-option.active .hsel-city { color: #a07820; }
 
+        /* MAP TEMPERATURE LABELS */
+        .temp-label {
+          position: absolute;
+          background: rgba(255,255,255,0.92);
+          border: 1px solid #cddbe8;
+          border-radius: 2px;
+          padding: 1px 5px;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          color: #4a6a8a;
+          white-space: nowrap;
+          pointer-events: none;
+          transform: translate(-50%, -210%);
+        }
+        .temp-label.sending   { border-color: #c49a00; color: #a07800; background: rgba(255,251,235,0.92); }
+        .temp-label.receiving { border-color: #1a7040; color: #1a7040; background: rgba(240,253,244,0.92); }
+        body[data-theme="dark"] .temp-label { background: rgba(7,13,20,0.92); border-color: #152434; color: #5a8a9a; }
+        body[data-theme="dark"] .temp-label.sending   { border-color: #d4a820; color: #d4a820; background: rgba(26,20,0,0.92); }
+        body[data-theme="dark"] .temp-label.receiving { border-color: #1e7a48; color: #1e9a58; background: rgba(0,24,16,0.92); }
+
         /* WEATHER LAYER CONTROLS */
         .map-wrap { position: relative; margin-top: 16px; }
         .weather-controls {
@@ -1196,9 +1245,6 @@ export default function App() {
                   <div className="bedside-content">
                     <div className="bedside-label">Bedside · Sending</div>
                     <div className="bedside-name">{sending.name}</div>
-                    {hospitalWeather[sending.id] != null && (
-                      <div className="bedside-wx">{hospitalWeather[sending.id]}°F</div>
-                    )}
                     <div className="bedside-time">{formatTime(bedsideMin)}</div>
                   </div>
                 </div>
@@ -1225,9 +1271,6 @@ export default function App() {
                   <div className="bedside-content">
                     <div className="bedside-label receiving">Bedside · Receiving</div>
                     <div className="bedside-name">{receiving.name}</div>
-                    {hospitalWeather[receiving.id] != null && (
-                      <div className="bedside-wx receiving">{hospitalWeather[receiving.id]}°F</div>
-                    )}
                     <div className="bedside-time">{formatTime(bedsideMin)}</div>
                   </div>
                 </div>
