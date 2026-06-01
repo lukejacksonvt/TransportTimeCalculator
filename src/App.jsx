@@ -312,7 +312,7 @@ function calcLegs(base, sending, receiving, mode) {
   };
 }
 
-const LOAD_TIME = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const LOAD_TIME = (() => { const d = new Date(); return `${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}`; })();
 
 function HospitalSelect({ value, onChange, placeholder, exclude, pinnedIds }) {
   const [open, setOpen] = useState(false);
