@@ -220,14 +220,17 @@ function calcLegs(base, sending, receiving, mode) {
 
 const LOAD_TIME = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-function HospitalSelect({ value, onChange, placeholder, exclude }) {
+function HospitalSelect({ value, onChange, placeholder, exclude, pinnedIds }) {
   const [open, setOpen] = useState(false);
+  const [meOpen, setMeOpen] = useState(false);
   const [nhOpen, setNhOpen] = useState(false);
   const [maOpen, setMaOpen] = useState(false);
   const ref = useRef(null);
 
   const available = exclude ? HOSPITALS.filter(h => h.id !== exclude) : HOSPITALS;
-  const me = available.filter(h => h.state === "ME");
+  const pinnedSet = new Set(pinnedIds || []);
+  const pinned = pinnedIds ? pinnedIds.map(id => available.find(h => h.id === id)).filter(Boolean) : [];
+  const me = available.filter(h => h.state === "ME" && !pinnedSet.has(h.id));
   const nh = available.filter(h => h.state === "NH");
   const ma = available.filter(h => h.state === "MA");
   const selected = HOSPITALS.find(h => h.id === value);
@@ -240,6 +243,7 @@ function HospitalSelect({ value, onChange, placeholder, exclude }) {
 
   const handleToggle = () => {
     if (!open && selected) {
+      setMeOpen(!pinnedSet.has(selected.id) && selected.state === "ME");
       setNhOpen(selected.state === "NH");
       setMaOpen(selected.state === "MA");
     }
@@ -247,6 +251,12 @@ function HospitalSelect({ value, onChange, placeholder, exclude }) {
   };
 
   const pick = id => { onChange(id); setOpen(false); };
+
+  const renderOption = h => (
+    <button key={h.id} type="button" className={`hsel-option${value === h.id ? " active" : ""}`} onClick={() => pick(h.id)}>
+      {h.name}<span className="hsel-city">{h.city}</span>
+    </button>
+  );
 
   return (
     <div className="hsel" ref={ref}>
@@ -256,28 +266,29 @@ function HospitalSelect({ value, onChange, placeholder, exclude }) {
       </button>
       {open && (
         <div className="hsel-panel">
-          <div className="hsel-state-label">Maine</div>
-          {me.map(h => (
-            <button key={h.id} type="button" className={`hsel-option${value === h.id ? " active" : ""}`} onClick={() => pick(h.id)}>
-              {h.name}<span className="hsel-city">{h.city}</span>
-            </button>
-          ))}
+          {pinned.length > 0 ? (
+            <>
+              <div className="hsel-state-label">Most Common</div>
+              {pinned.map(renderOption)}
+              <button type="button" className="hsel-state-toggle" onClick={() => setMeOpen(o => !o)}>
+                <span>Maine</span><span>{meOpen ? "▴" : "▾"}</span>
+              </button>
+              {meOpen && me.map(renderOption)}
+            </>
+          ) : (
+            <>
+              <div className="hsel-state-label">Maine</div>
+              {me.map(renderOption)}
+            </>
+          )}
           <button type="button" className="hsel-state-toggle" onClick={() => setNhOpen(o => !o)}>
             <span>New Hampshire</span><span>{nhOpen ? "▴" : "▾"}</span>
           </button>
-          {nhOpen && nh.map(h => (
-            <button key={h.id} type="button" className={`hsel-option${value === h.id ? " active" : ""}`} onClick={() => pick(h.id)}>
-              {h.name}<span className="hsel-city">{h.city}</span>
-            </button>
-          ))}
+          {nhOpen && nh.map(renderOption)}
           <button type="button" className="hsel-state-toggle" onClick={() => setMaOpen(o => !o)}>
             <span>Massachusetts</span><span>{maOpen ? "▴" : "▾"}</span>
           </button>
-          {maOpen && ma.map(h => (
-            <button key={h.id} type="button" className={`hsel-option${value === h.id ? " active" : ""}`} onClick={() => pick(h.id)}>
-              {h.name}<span className="hsel-city">{h.city}</span>
-            </button>
-          ))}
+          {maOpen && ma.map(renderOption)}
         </div>
       )}
     </div>
@@ -1029,6 +1040,7 @@ export default function App() {
                 onChange={setReceivingId}
                 placeholder="— Select receiving hospital —"
                 exclude={sendingId}
+                pinnedIds={["mmmc", "emmc", "cmmc"]}
               />
             </div>
           </div>
