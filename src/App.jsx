@@ -658,7 +658,7 @@ export default function App() {
         .header-row { display: flex; align-items: center; gap: 16px; }
         .logo { height: 48px; width: auto; }
         .title { font-size: 24px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #1a2d40; line-height: 1; }
-        .sub { font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 0.18em; color: #8aaac4; margin-top: 5px; }
+        .sub { font-family: 'Share Tech Mono', monospace; font-size: 15px; font-weight: 700; letter-spacing: 0.12em; color: #1a2d40; margin-top: 5px; }
 
         /* CARD */
         .card {
@@ -1008,9 +1008,27 @@ export default function App() {
         /* BEDSIDE PRESET SELECTOR */
         .bedside-row {
           display: flex;
-          justify-content: flex-end;
+          justify-content: space-between;
+          align-items: flex-start;
           margin-bottom: 16px;
         }
+        .reset-pill {
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          background: transparent;
+          border: 1px solid #cddbe8;
+          color: #8aaac4;
+          border-radius: 99px;
+          padding: 5px 14px;
+          cursor: pointer;
+          transition: all 0.18s;
+          margin-top: 16px;
+        }
+        .reset-pill:hover { border-color: #c02020; color: #c02020; background: #fff2f2; }
+        body[data-theme="dark"] .reset-pill { border-color: #152434; color: #2e5a72; }
+        body[data-theme="dark"] .reset-pill:hover { border-color: #c04040; color: #e05050; background: #1a0000; }
         .bedside-selector {
           width: 162px;
         }
@@ -1193,7 +1211,7 @@ export default function App() {
         /* DARK THEME OVERRIDES */
         body[data-theme="dark"] { background: #070d14; color: #b8ccd8; }
         body[data-theme="dark"] .title { color: #deeaf2; }
-        body[data-theme="dark"] .sub { color: #2e5a72; }
+        body[data-theme="dark"] .sub { color: #7aaabb; }
         body[data-theme="dark"] .card { background: #0b1520; border-color: #152434; }
         body[data-theme="dark"] .card::before { background: linear-gradient(to bottom, #d4a820, #1e7a48); }
         body[data-theme="dark"] .sec-label { color: #2e5a72; }
@@ -1241,13 +1259,17 @@ export default function App() {
             <img src="/lifeflight-logo.svg" className="logo" alt="LifeFlight of Maine" />
             <div>
               <div className="title">Mission Time Calculator</div>
-              <div className="sub">Full Transport Profile · {LOAD_TIME}</div>
+              <div className="sub">{LOAD_TIME}</div>
             </div>
           </div>
         </div>
 
         <div className="card">
           <div className="bedside-row">
+            <button
+              className="reset-pill"
+              onClick={() => { setBaseId(""); setCrewBaseId(""); setSendingId(""); setReceivingId(""); setMode("ground"); setBedsideMin(40); }}
+            >Reset</button>
             <div className="bedside-selector">
               <div className="sec-label">Bedside Time</div>
               <div className="sel-wrap">
