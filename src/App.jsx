@@ -11,6 +11,7 @@ const HOSPITALS = [
   { id: "dcmh",   state: "ME", name: "Down East Community Hospital",        city: "Machias",       lat: 44.7166, lng: -67.4637 },
   { id: "emmc",   state: "ME", name: "Eastern Maine Medical Center",        city: "Bangor",        lat: 44.8012, lng: -68.7778 },
   { id: "nfh",    state: "ME", name: "Franklin Memorial Hospital",          city: "Farmington",    lat: 44.6700, lng: -70.1520 },
+  { id: "nmmc",   state: "ME", name: "Northern Maine Medical Center",        city: "Fort Kent",     lat: 47.2574, lng: -68.5912 },
   { id: "houlton",state: "ME", name: "Houlton Regional Hospital",           city: "Houlton",       lat: 46.1284, lng: -67.8393 },
   { id: "mgh",    state: "ME", name: "Maine General – Augusta",             city: "Augusta",       lat: 44.3106, lng: -69.7795 },
   { id: "mgt",    state: "ME", name: "Maine General – Thayer",              city: "Waterville",    lat: 44.5516, lng: -69.6350 },
