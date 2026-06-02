@@ -467,6 +467,8 @@ export default function App() {
 
     const gLeg = (key, from, to, fLat, fLng, tLat, tLng) => ({
       type: "ground",
+      key,
+      toCoord: { lat: tLat, lng: tLng },
       label: `Ground · ${from} → ${to}`,
       time:  gl?.[key]?.time  ?? groundMin(haversine(fLat, fLng, tLat, tLng)),
       miles: gl?.[key]?.miles ?? Math.round(haversine(fLat, fLng, tLat, tLng)),
@@ -474,6 +476,7 @@ export default function App() {
     });
     const fLeg = (a, b) => ({
       type: "flight",
+      toCoord: { lat: b.lat, lng: b.lng },
       label: `Flight · ${a.code} → ${b.code}`,
       time:  fwFlightMin(a.lat, a.lng, b.lat, b.lng),
       miles: Math.round(haversine(a.lat, a.lng, b.lat, b.lng) * 0.868976),
@@ -716,28 +719,29 @@ export default function App() {
     let path;
     let strokeColor = "#d4a820";
 
-    if (mode === "fw") {
+    if (mode === "fw" && fwResult) {
       strokeColor = "#3060b0";
       const sendApt = AIRPORTS.find(a => a.id === sendingAirportId);
       const recvApt = AIRPORTS.find(a => a.id === receivingAirportId);
       const bgrApt  = AIRPORTS.find(a => a.id === "bgr");
-      // Airport markers (diamond shape via scale-4 circle)
       if (sendApt) mkr({ lat: sendApt.lat, lng: sendApt.lng }, "#3060b0", "#6090d0");
       if (recvApt && recvApt.id !== sendApt?.id) mkr({ lat: recvApt.lat, lng: recvApt.lng }, "#3060b0", "#6090d0");
-      // Trace waypoints in mission order
-      const waypoints = [{ lat: bgrApt.lat, lng: bgrApt.lng }];
-      if (sendApt && sendingAirportId !== "bgr") waypoints.push({ lat: sendApt.lat, lng: sendApt.lng });
-      waypoints.push({ lat: sending.lat, lng: sending.lng });
-      if (sendingAirportId === "bgr" && receivingAirportId === "bgr") {
-        waypoints.push({ lat: receiving.lat, lng: receiving.lng });
-      } else {
-        if (sendApt) waypoints.push({ lat: sendApt.lat, lng: sendApt.lng });
-        if (recvApt && recvApt.id !== sendApt?.id) waypoints.push({ lat: recvApt.lat, lng: recvApt.lng });
-        waypoints.push({ lat: receiving.lat, lng: receiving.lng });
+      // Build continuous path: road geometry for ground legs, straight lines for flights
+      const pts = [{ lat: bgrApt.lat, lng: bgrApt.lng }];
+      for (const leg of fwResult.legs) {
+        if (leg.type === "lift" || leg.type === "bedside") continue;
+        if (leg.type === "flight") {
+          pts.push(leg.toCoord);
+        } else if (leg.type === "ground") {
+          const enc = fwGroundLegs?.[leg.key]?.polyline;
+          if (enc) {
+            pts.push(...decodePolyline(enc));
+          } else {
+            pts.push(leg.toCoord);
+          }
+        }
       }
-      if (recvApt && receivingAirportId !== "bgr") waypoints.push({ lat: recvApt.lat, lng: recvApt.lng });
-      waypoints.push({ lat: bgrApt.lat, lng: bgrApt.lng });
-      path = waypoints;
+      path = pts;
     } else if (mode === "ground" && groundRoute) {
       strokeColor = "#d4a820";
       path = decodePolyline(groundRoute.polyline.encodedPolyline);
@@ -760,7 +764,7 @@ export default function App() {
     const bounds = new window.google.maps.LatLngBounds();
     path.forEach(pt => bounds.extend(pt));
     mapInstanceRef.current.fitBounds(bounds, 60);
-  }, [valid, baseId, sendingId, receivingId, mode, groundRoute, sendingAirportId, receivingAirportId]);
+  }, [valid, baseId, sendingId, receivingId, mode, groundRoute, sendingAirportId, receivingAirportId, fwGroundLegs]);
 
   return (
     <>
