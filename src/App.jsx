@@ -179,6 +179,21 @@ function formatTime(mins) {
 // Parse Routes API duration string e.g. "3600s" → 3600
 const parseSecs = s => parseInt(s) || 0;
 
+// Fixed Wing — King Air B200 with Raisbeck EPIC Platinum
+const FW_SPEED_KTS = 270;
+const FW_LIFT_MIN  = 30;
+const FW_OPS_MIN   = 10; // per flight leg overhead (departure + arrival)
+
+const AIRPORTS = [
+  { id: "bgr", code: "KBGR", name: "Bangor International Airport",    lat: 44.8074, lng: -68.8281 },
+  { id: "pwm", code: "KPWM", name: "Portland International Jetport",  lat: 43.6462, lng: -70.3087 },
+];
+
+function fwFlightMin(lat1, lng1, lat2, lng2) {
+  const nm = haversine(lat1, lng1, lat2, lng2) * 0.868976; // statute → nautical miles
+  return Math.round((nm / FW_SPEED_KTS) * 60 + FW_OPS_MIN);
+}
+
 const BASE_SHIFTS = {
   sanford:       [{ start: 800,  end: 2000 }, { start: 2000, end: 800  }],
   cmmc_base:     [{ start: 1000, end: 2200 }],
@@ -402,6 +417,9 @@ export default function App() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [groundRoute, setGroundRoute] = useState(null);
+  const [fwGroundLegs, setFwGroundLegs] = useState(null);
+  const [sendingAirportId, setSendingAirportId] = useState("");
+  const [receivingAirportId, setReceivingAirportId] = useState("");
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
   const [bedsideMin, setBedsideMin] = useState(40);
@@ -422,7 +440,7 @@ export default function App() {
   const legMeta = groundRoute ? "road routing" : "transit";
 
   const bedsideTotal = bedsideMin * 2;
-  const haverResult = valid ? calcLegs(base, sending, receiving, mode) : null;
+  const haverResult = (valid && mode !== "fw") ? calcLegs(base, sending, receiving, mode) : null;
   const result = (() => {
     if (!haverResult) return null;
     if (mode !== "ground" || !groundRoute) {
@@ -437,13 +455,58 @@ export default function App() {
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
     return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
   })();
+
+  const fwResult = (() => {
+    if (mode !== "fw" || !valid || !sendingAirportId || !receivingAirportId) return null;
+    const sendApt  = AIRPORTS.find(a => a.id === sendingAirportId);
+    const recvApt  = AIRPORTS.find(a => a.id === receivingAirportId);
+    const bgrApt   = AIRPORTS.find(a => a.id === "bgr");
+    const isBgrBoth = sendingAirportId === "bgr" && receivingAirportId === "bgr";
+    const sameApt   = sendingAirportId === receivingAirportId;
+    const gl = fwGroundLegs;
+
+    const gLeg = (key, from, to, fLat, fLng, tLat, tLng) => ({
+      type: "ground",
+      label: `Ground · ${from} → ${to}`,
+      time:  gl?.[key]?.time  ?? groundMin(haversine(fLat, fLng, tLat, tLng)),
+      miles: gl?.[key]?.miles ?? Math.round(haversine(fLat, fLng, tLat, tLng)),
+      live: !!gl?.[key]?.time,
+    });
+    const fLeg = (a, b) => ({
+      type: "flight",
+      label: `Flight · ${a.code} → ${b.code}`,
+      time:  fwFlightMin(a.lat, a.lng, b.lat, b.lng),
+      miles: Math.round(haversine(a.lat, a.lng, b.lat, b.lng) * 0.868976),
+    });
+
+    const legs = [];
+    legs.push({ type: "lift", label: "Lift · 600 Hangar (KBGR)", time: FW_LIFT_MIN });
+    if (sendingAirportId !== "bgr") legs.push(fLeg(bgrApt, sendApt));
+    legs.push(gLeg("aptToSend", sendApt.code, sending.city, sendApt.lat, sendApt.lng, sending.lat, sending.lng));
+    legs.push({ type: "bedside", side: "sending", hospital: sending, time: bedsideMin });
+    if (isBgrBoth) {
+      legs.push(gLeg("sendToRecv", sending.city, receiving.city, sending.lat, sending.lng, receiving.lat, receiving.lng));
+    } else {
+      legs.push(gLeg("sendToApt", sending.city, sendApt.code, sending.lat, sending.lng, sendApt.lat, sendApt.lng));
+      if (!sameApt) legs.push(fLeg(sendApt, recvApt));
+      legs.push(gLeg("aptToRecv", recvApt.code, receiving.city, recvApt.lat, recvApt.lng, receiving.lat, receiving.lng));
+    }
+    legs.push({ type: "bedside", side: "receiving", hospital: receiving, time: bedsideMin });
+    legs.push(gLeg("recvToApt", receiving.city, recvApt.code, receiving.lat, receiving.lng, recvApt.lat, recvApt.lng));
+    if (receivingAirportId !== "bgr") legs.push(fLeg(recvApt, bgrApt));
+
+    const transit = legs.filter(l => l.type !== "bedside").reduce((s, l) => s + l.time, 0);
+    return { legs, transit, total: transit + bedsideMin * 2 };
+  })();
+
   const shiftInfo = (() => {
     const shiftBaseId = baseId === "current" ? crewBaseId : baseId;
     if (!shiftBaseId) return null;
     const active = getActiveShift(shiftBaseId, now);
     if (!active) return { status: "none" };
-    if (!result) return { status: "idle", label: active.label };
-    const returnTime = new Date(now.getTime() + result.total * 60 * 1000);
+    const activeResult = mode === "fw" ? fwResult : result;
+    if (!activeResult) return { status: "idle", label: active.label };
+    const returnTime = new Date(now.getTime() + activeResult.total * 60 * 1000);
     const gracePeriodEnd = new Date(active.end.getTime() + 2 * 60 * 60 * 1000);
     const rStr = t => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
     const status = returnTime <= active.end ? "green" : returnTime <= gracePeriodEnd ? "yellow" : "red";
@@ -527,6 +590,42 @@ export default function App() {
     });
   }, [baseId, sendingId, receivingId, mode]);
 
+  // Reset FW mode if base changes away from 600 Hangar
+  useEffect(() => {
+    if (mode === "fw" && baseId !== "bangor_hangar") setMode("ground");
+  }, [baseId]);
+
+  // Compute FW ground legs (one Routes API call per segment)
+  useEffect(() => {
+    if (mode !== "fw" || !valid || !sendingAirportId || !receivingAirportId) { setFwGroundLegs(null); return; }
+    const sendApt   = AIRPORTS.find(a => a.id === sendingAirportId);
+    const recvApt   = AIRPORTS.find(a => a.id === receivingAirportId);
+    const isBgrBoth = sendingAirportId === "bgr" && receivingAirportId === "bgr";
+    const calls = [
+      computeRoute({ lat: sendApt.lat, lng: sendApt.lng }, [], { lat: sending.lat,  lng: sending.lng  }).then(r => ["aptToSend", r]),
+      computeRoute({ lat: receiving.lat, lng: receiving.lng }, [], { lat: recvApt.lat, lng: recvApt.lng }).then(r => ["recvToApt", r]),
+      ...(isBgrBoth
+        ? [computeRoute({ lat: sending.lat, lng: sending.lng }, [], { lat: receiving.lat, lng: receiving.lng }).then(r => ["sendToRecv", r])]
+        : [
+            computeRoute({ lat: sending.lat, lng: sending.lng }, [], { lat: sendApt.lat, lng: sendApt.lng }).then(r => ["sendToApt", r]),
+            computeRoute({ lat: recvApt.lat, lng: recvApt.lng }, [], { lat: receiving.lat, lng: receiving.lng }).then(r => ["aptToRecv", r]),
+          ]
+      ),
+    ];
+    Promise.all(calls).then(results => {
+      const legs = {};
+      results.forEach(([key, route]) => {
+        const apiLeg = route?.legs?.[0];
+        legs[key] = {
+          time:     apiLeg ? Math.round(parseSecs(apiLeg.duration) / 60) : null,
+          miles:    apiLeg ? Math.round((apiLeg.distanceMeters ?? 0) / 1609.34) : null,
+          polyline: route?.polyline?.encodedPolyline ?? null,
+        };
+      });
+      setFwGroundLegs(legs);
+    });
+  }, [mode, baseId, sendingId, receivingId, sendingAirportId, receivingAirportId]);
+
   // Init map when div mounts and API is ready
   useEffect(() => {
     if (!isLoaded || !mapDivRef.current || mapInstanceRef.current) return;
@@ -539,7 +638,7 @@ export default function App() {
       gestureHandling: "cooperative",
     });
     setMapReady(true);
-  }, [isLoaded, result]);
+  }, [isLoaded, result, fwResult]);
 
   // Update map styles when theme changes
   useEffect(() => {
@@ -614,27 +713,54 @@ export default function App() {
     mkr({ lat: sending.lat, lng: sending.lng }, "#d4a820", "#f0c840");
     mkr({ lat: receiving.lat, lng: receiving.lng }, "#1e7a48", "#2eb868");
 
-    const isGroundWithRoute = mode === "ground" && groundRoute;
-    const path = isGroundWithRoute
-      ? decodePolyline(groundRoute.polyline.encodedPolyline)
-      : [
-          { lat: base.lat, lng: base.lng },
-          { lat: sending.lat, lng: sending.lng },
-          { lat: receiving.lat, lng: receiving.lng },
-          ...(base.restockId ? [CMMC_COORDS] : []),
-          { lat: base.lat, lng: base.lng },
-        ];
+    let path;
+    let strokeColor = "#d4a820";
+
+    if (mode === "fw") {
+      strokeColor = "#3060b0";
+      const sendApt = AIRPORTS.find(a => a.id === sendingAirportId);
+      const recvApt = AIRPORTS.find(a => a.id === receivingAirportId);
+      const bgrApt  = AIRPORTS.find(a => a.id === "bgr");
+      // Airport markers (diamond shape via scale-4 circle)
+      if (sendApt) mkr({ lat: sendApt.lat, lng: sendApt.lng }, "#3060b0", "#6090d0");
+      if (recvApt && recvApt.id !== sendApt?.id) mkr({ lat: recvApt.lat, lng: recvApt.lng }, "#3060b0", "#6090d0");
+      // Trace waypoints in mission order
+      const waypoints = [{ lat: bgrApt.lat, lng: bgrApt.lng }];
+      if (sendApt && sendingAirportId !== "bgr") waypoints.push({ lat: sendApt.lat, lng: sendApt.lng });
+      waypoints.push({ lat: sending.lat, lng: sending.lng });
+      if (sendingAirportId === "bgr" && receivingAirportId === "bgr") {
+        waypoints.push({ lat: receiving.lat, lng: receiving.lng });
+      } else {
+        if (sendApt) waypoints.push({ lat: sendApt.lat, lng: sendApt.lng });
+        if (recvApt && recvApt.id !== sendApt?.id) waypoints.push({ lat: recvApt.lat, lng: recvApt.lng });
+        waypoints.push({ lat: receiving.lat, lng: receiving.lng });
+      }
+      if (recvApt && receivingAirportId !== "bgr") waypoints.push({ lat: recvApt.lat, lng: recvApt.lng });
+      waypoints.push({ lat: bgrApt.lat, lng: bgrApt.lng });
+      path = waypoints;
+    } else if (mode === "ground" && groundRoute) {
+      strokeColor = "#d4a820";
+      path = decodePolyline(groundRoute.polyline.encodedPolyline);
+    } else {
+      strokeColor = mode === "air" ? "#1e9a58" : "#d4a820";
+      path = [
+        { lat: base.lat, lng: base.lng },
+        { lat: sending.lat, lng: sending.lng },
+        { lat: receiving.lat, lng: receiving.lng },
+        ...(base.restockId ? [CMMC_COORDS] : []),
+        { lat: base.lat, lng: base.lng },
+      ];
+    }
 
     polylineRef.current = new window.google.maps.Polyline({
       path, map: mapInstanceRef.current,
-      strokeColor: mode === "air" ? "#1e9a58" : "#d4a820",
-      strokeOpacity: 0.85, strokeWeight: 3,
+      strokeColor, strokeOpacity: 0.85, strokeWeight: 3,
     });
 
     const bounds = new window.google.maps.LatLngBounds();
     path.forEach(pt => bounds.extend(pt));
     mapInstanceRef.current.fitBounds(bounds, 60);
-  }, [valid, baseId, sendingId, receivingId, mode, groundRoute]);
+  }, [valid, baseId, sendingId, receivingId, mode, groundRoute, sendingAirportId, receivingAirportId]);
 
   return (
     <>
@@ -734,10 +860,30 @@ export default function App() {
           transition: all 0.18s;
         }
         .mode-btn:first-child { border-radius: 2px 0 0 2px; }
-        .mode-btn:last-child { border-radius: 0 2px 2px 0; border-left: none; }
+        .mode-btn:last-child { border-radius: 0 2px 2px 0; }
+        .mode-btn:not(:first-child) { border-left: none; }
         .mode-btn.active.ground { background: #fffbeb; border-color: #c49a00; color: #a07800; }
-        .mode-btn.active.air { background: #f0fdf4; border-color: #1a7040; color: #1a7040; }
-        .mode-btn:not(.active):hover { border-color: #b0c8e0; color: #4a6a8a; }
+        .mode-btn.active.air    { background: #f0fdf4; border-color: #1a7040; color: #1a7040; }
+        .mode-btn.active.fw     { background: #f0f4ff; border-color: #3060b0; color: #3060b0; }
+        .mode-btn:not(.active):not(:disabled):hover { border-color: #b0c8e0; color: #4a6a8a; }
+        .mode-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        /* FIXED WING LEGS */
+        .leg-dot.fw   { border-color: #3060b0; }
+        .leg-dot.lift { border-color: #3060b0; background: #3060b0; width: 11px; height: 11px; border-radius: 2px; }
+        .leg-dot.flight-dot { border-color: #3060b0; background: #d0e0ff; }
+        .leg-meta.fw { color: #3060b0; }
+        .leg-time.fw { color: #1a3a70; }
+        .total-box.highlight.fw { border-color: #3060b0; background: #f0f4ff; }
+        .total-label.blue { color: #3060b0; }
+        body[data-theme="dark"] .mode-btn.active.fw     { background: #080e1e; border-color: #3a6ad4; color: #3a6ad4; }
+        body[data-theme="dark"] .leg-dot.fw             { border-color: #3a6ad4; }
+        body[data-theme="dark"] .leg-dot.lift           { border-color: #3a6ad4; background: #3a6ad4; }
+        body[data-theme="dark"] .leg-dot.flight-dot     { border-color: #3a6ad4; background: #0a1830; }
+        body[data-theme="dark"] .leg-meta.fw            { color: #3a6ad4; }
+        body[data-theme="dark"] .leg-time.fw            { color: #aac0e8; }
+        body[data-theme="dark"] .total-box.highlight.fw { border-color: #3a6ad4; background: #080e1e; }
+        body[data-theme="dark"] .total-label.blue       { color: #3a6ad4; }
 
         /* SHIFT INDICATOR */
         .shift-indicator {
@@ -1321,6 +1467,18 @@ export default function App() {
               />
             </div>
 
+            {mode === "fw" && (
+              <div className="field">
+                <div className="sec-label">Sending Airport</div>
+                <div className="sel-wrap">
+                  <select value={sendingAirportId} onChange={e => setSendingAirportId(e.target.value)}>
+                    <option value="">— Select airport —</option>
+                    {AIRPORTS.map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
             <div className="field">
               <div className="sec-label">Receiving Hospital</div>
               <HospitalSelect
@@ -1331,6 +1489,18 @@ export default function App() {
                 pinnedIds={["mmmc", "emmc", "cmmc"]}
               />
             </div>
+
+            {mode === "fw" && (
+              <div className="field">
+                <div className="sec-label">Receiving Airport</div>
+                <div className="sel-wrap">
+                  <select value={receivingAirportId} onChange={e => setReceivingAirportId(e.target.value)}>
+                    <option value="">— Select airport —</option>
+                    {AIRPORTS.map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mode-row">
@@ -1342,6 +1512,12 @@ export default function App() {
               className={`mode-btn air${mode === "air" ? " active air" : ""}`}
               onClick={() => setMode("air")}
             >Rotor</button>
+            <button
+              className={`mode-btn fw${mode === "fw" ? " active fw" : ""}`}
+              onClick={() => setMode("fw")}
+              disabled={baseId !== "bangor_hangar"}
+              title={baseId !== "bangor_hangar" ? "Fixed wing departs from 600 Hangar only" : ""}
+            >Fixed Wing</button>
           </div>
 
           {shiftInfo && (
@@ -1363,7 +1539,103 @@ export default function App() {
             </div>
           )}
 
-          {result ? (
+          {mode === "fw" ? (
+            fwResult ? (
+              <div className="profile" key={`fw-${sendingId}-${receivingId}-${sendingAirportId}-${receivingAirportId}`}>
+                <div className="divider">Mission Profile</div>
+                <div className="legs">
+                  {fwResult.legs.map((leg, i) => {
+                    const isLast = i === fwResult.legs.length - 1;
+                    const nextIsBedside = fwResult.legs[i + 1]?.type === "bedside";
+                    if (leg.type === "bedside") {
+                      const isSending = leg.side === "sending";
+                      return (
+                        <div key={i} className="bedside-stop">
+                          <div className="bedside-connector">
+                            <div className={`bedside-dot${isSending ? "" : " receiving"}`}>+</div>
+                            <div className="bedside-line" />
+                          </div>
+                          <div className="bedside-content">
+                            <div className={`bedside-label${isSending ? "" : " receiving"}`}>Bedside · {isSending ? "Sending" : "Receiving"}</div>
+                            <div className="bedside-name">{leg.hospital.name}</div>
+                            <div className="bedside-time">{formatTime(leg.time)}</div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (leg.type === "lift") {
+                      return (
+                        <div key={i} className="leg">
+                          <div className="leg-connector">
+                            <div className="leg-dot lift" />
+                            <div className="leg-line" />
+                          </div>
+                          <div className="leg-content">
+                            <div className="leg-route">{leg.label}</div>
+                            <div className="leg-meta fw">Crew ready · pre-mission setup</div>
+                            <div className="leg-time fw">{formatTime(leg.time)}</div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (leg.type === "flight") {
+                      return (
+                        <div key={i} className="leg">
+                          <div className="leg-connector">
+                            <div className="leg-dot flight-dot" />
+                            {(!isLast && !nextIsBedside) && <div className="leg-line" />}
+                            {nextIsBedside && <div className="leg-line" />}
+                          </div>
+                          <div className="leg-content">
+                            <div className="leg-route">{leg.label}</div>
+                            <div className="leg-meta fw">{leg.miles} nm · {FW_SPEED_KTS} kts</div>
+                            <div className="leg-time fw">{formatTime(leg.time)}</div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    // ground
+                    return (
+                      <div key={i} className="leg">
+                        <div className="leg-connector">
+                          <div className="leg-dot fw" />
+                          {(!isLast) && <div className="leg-line" />}
+                        </div>
+                        <div className="leg-content">
+                          <div className="leg-route">{leg.label}</div>
+                          <div className="leg-meta">{leg.miles} mi · {leg.live ? "road routing" : "transit"}</div>
+                          <div className="leg-time">{formatTime(leg.time)}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="totals">
+                  <div className="total-box">
+                    <div className="total-label">Transit Only</div>
+                    <div className="total-value">{formatTime(fwResult.transit)}</div>
+                    <div className="total-breakdown">Lift + flights + ground</div>
+                  </div>
+                  <div className="total-box highlight fw">
+                    <div className="total-label blue">Total Mission</div>
+                    <div className="total-value">{formatTime(fwResult.total)}</div>
+                    <div className="total-breakdown">Transit + {bedsideTotal} min bedside</div>
+                  </div>
+                </div>
+
+                <div className="disclaimer">
+                  ⚠ Fixed Wing: straight-line {FW_SPEED_KTS} kts + {FW_OPS_MIN} min ops per leg · Ground transfers via Google Routes API · Estimates only — not for clinical decision-making
+                </div>
+              </div>
+            ) : (
+              <div className="hint">
+                {!valid ? "Select sending and receiving hospitals"
+                  : !sendingAirportId || !receivingAirportId ? "Select sending and receiving airports to calculate"
+                  : ""}
+              </div>
+            )
+          ) : result ? (
             <div className="profile" key={`${baseId}-${sendingId}-${receivingId}-${mode}`}>
               <div className="divider">Mission Profile</div>
 
@@ -1374,7 +1646,6 @@ export default function App() {
               )}
 
               <div className="legs">
-                {/* Leg 1: Base to Sending */}
                 <div className="leg">
                   <div className="leg-connector">
                     <div className="leg-dot dim" />
@@ -1387,7 +1658,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Bedside: Sending */}
                 <div className="bedside-stop">
                   <div className="bedside-connector">
                     <div className="bedside-dot">+</div>
@@ -1400,7 +1670,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Leg 2: Sending to Receiving */}
                 <div className="leg">
                   <div className="leg-connector">
                     <div className="leg-dot dim" />
@@ -1413,7 +1682,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Bedside: Receiving */}
                 <div className="bedside-stop">
                   <div className="bedside-connector">
                     <div className="bedside-dot receiving">+</div>
@@ -1426,7 +1694,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Leg 3: back (either to CMMC restock or to base) */}
                 <div className="leg">
                   <div className="leg-connector">
                     <div className="leg-dot dim" />
@@ -1440,7 +1707,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Leg 4: CMMC to Rodman Road (Rodman only) */}
                 {isRodman && result.legs[3] && (
                   <div className="leg">
                     <div className="leg-connector">
@@ -1481,7 +1747,7 @@ export default function App() {
           )}
         </div>
 
-        {isLoaded && result && (
+        {isLoaded && (result || fwResult) && (
           <div className="map-wrap">
             <div
               ref={mapDivRef}
