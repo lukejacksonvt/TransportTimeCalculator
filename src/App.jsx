@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 const HOSPITALS = [
   // Maine
@@ -545,6 +545,16 @@ export default function App() {
   const weatherLayerRef = useRef(null);
   const trafficLayerRef = useRef(null);
   const tempLabelsRef = useRef([]);
+
+  // Ref callback: clears the Maps instance when the div unmounts so it
+  // gets re-created on the new element when the div remounts (e.g. FW mode switch)
+  const mapDivRefCallback = useCallback((el) => {
+    mapDivRef.current = el;
+    if (!el) {
+      mapInstanceRef.current = null;
+      setMapReady(false);
+    }
+  }, []);
 
   useEffect(() => {
     document.body.dataset.theme = isDark ? "dark" : "light";
@@ -1792,7 +1802,7 @@ export default function App() {
         {isLoaded && (result || fwResult) && (
           <div className="map-wrap">
             <div
-              ref={mapDivRef}
+              ref={mapDivRefCallback}
               style={{ display: "block", width: "100%", borderRadius: 4, overflow: "hidden", height: 320,
                 border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
             />
