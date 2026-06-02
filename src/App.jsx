@@ -288,7 +288,7 @@ async function computeRoute(origin, waypoints, destination) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Goog-FieldMask": "routes.legs.duration,routes.legs.distanceMeters,routes.polyline.encodedPolyline",
+      "X-Goog-FieldMask": "routes.legs.duration,routes.legs.distanceMeters,routes.legs.polyline.encodedPolyline",
     },
     body: JSON.stringify({
       origin:      { location: { latLng: { latitude: origin.lat,      longitude: origin.lng      } } },
@@ -644,7 +644,7 @@ export default function App() {
         legs[key] = {
           time:     apiLeg ? Math.round(parseSecs(apiLeg.duration) / 60) : null,
           miles:    apiLeg ? Math.round((apiLeg.distanceMeters ?? 0) / 1609.34) : null,
-          polyline: route?.polyline?.encodedPolyline ?? null,
+          polyline: apiLeg?.polyline?.encodedPolyline ?? null,
         };
       });
       setFwGroundLegs(legs);
@@ -766,7 +766,9 @@ export default function App() {
       path = pts;
     } else if (mode === "ground" && groundRoute) {
       strokeColor = "#d4a820";
-      path = decodePolyline(groundRoute.polyline.encodedPolyline);
+      path = (groundRoute.legs ?? []).flatMap(leg =>
+        leg.polyline?.encodedPolyline ? decodePolyline(leg.polyline.encodedPolyline) : []
+      );
     } else {
       strokeColor = mode === "air" ? "#1e9a58" : "#d4a820";
       path = [
