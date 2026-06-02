@@ -1341,7 +1341,7 @@ export default function App() {
             <button
               className={`mode-btn air${mode === "air" ? " active air" : ""}`}
               onClick={() => setMode("air")}
-            >Air</button>
+            >Rotor</button>
           </div>
 
           {shiftInfo && (
@@ -1469,7 +1469,7 @@ export default function App() {
               </div>
 
               <div className="disclaimer">
-                ⚠ Ground: road routing via Google Routes API (traffic-aware) · Air: straight-line 145 kts + 10 min ops · Estimates only — not for clinical decision-making
+                ⚠ Ground: road routing via Google Routes API (traffic-aware) · Rotor: straight-line 145 kts + 10 min ops · Estimates only — not for clinical decision-making
               </div>
             </div>
           ) : (
