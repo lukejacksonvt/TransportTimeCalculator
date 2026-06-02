@@ -697,8 +697,8 @@ export default function App() {
           border: 1px solid #cddbe8;
           color: #2a4060;
           font-family: 'Barlow Condensed', sans-serif;
-          font-size: 15px;
-          padding: 9px 34px 9px 12px;
+          font-size: 17px;
+          padding: 12px 34px 12px 12px;
           border-radius: 2px;
           appearance: none;
           cursor: pointer;
@@ -1323,6 +1323,8 @@ export default function App() {
           </div>
 
           {shiftInfo && (
+            <div>
+            <div className="sec-label" style={{ marginTop: 14, marginBottom: 6 }}>Shift Consideration</div>
             <div className={`shift-indicator si-${shiftInfo.status}`}>
               <div className="si-left">
                 <div className="si-dot" />
@@ -1335,6 +1337,7 @@ export default function App() {
               {shiftInfo.returnStr && (
                 <span className="si-return">Est. return {shiftInfo.returnStr}</span>
               )}
+            </div>
             </div>
           )}
 
