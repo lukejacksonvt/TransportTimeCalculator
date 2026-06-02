@@ -599,7 +599,8 @@ export default function App() {
     };
     fetchWx(sending);
     fetchWx(receiving);
-  }, [sendingId, receivingId]);
+    fetchWx(base);
+  }, [sendingId, receivingId, baseId]);
 
   useEffect(() => {
     if (!valid || mode !== "ground") { setGroundRoute(null); return; }
@@ -724,12 +725,14 @@ export default function App() {
     if (!mapInstanceRef.current || !window.google || !valid) return;
     const map = mapInstanceRef.current;
     const labels = [];
+    if (base && hospitalWeather[base.id] != null)
+      labels.push(makeTempLabel({ lat: base.lat, lng: base.lng }, `${hospitalWeather[base.id]}°F`, "sending", map));
     if (hospitalWeather[sending.id] != null)
       labels.push(makeTempLabel({ lat: sending.lat, lng: sending.lng }, `${hospitalWeather[sending.id]}°F`, "sending", map));
     if (hospitalWeather[receiving.id] != null)
       labels.push(makeTempLabel({ lat: receiving.lat, lng: receiving.lng }, `${hospitalWeather[receiving.id]}°F`, "receiving", map));
     tempLabelsRef.current = labels;
-  }, [hospitalWeather, sendingId, receivingId, valid, mapReady]);
+  }, [hospitalWeather, baseId, sendingId, receivingId, valid, mapReady]);
 
   // Update markers, polyline, and fitBounds when route changes
   useEffect(() => {
