@@ -944,6 +944,22 @@ export default function App() {
         .si-left { display: flex; align-items: center; gap: 6px; }
         .si-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
         .si-return { font-weight: 600; }
+        .si-legend {
+          display: flex;
+          gap: 12px;
+          margin-top: 5px;
+          padding-left: 2px;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 9px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+        .si-legend-item.green  { color: #1a7040; }
+        .si-legend-item.yellow { color: #a07800; }
+        .si-legend-item.red    { color: #c02020; }
+        body[data-theme="dark"] .si-legend-item.green  { color: #1e9a58; }
+        body[data-theme="dark"] .si-legend-item.yellow { color: #d4a820; }
+        body[data-theme="dark"] .si-legend-item.red    { color: #e05050; }
         .shift-indicator.si-none { background: #f8fafc; border-color: #cddbe8; color: #8aaac4; }
         .shift-indicator.si-idle { background: #f8fafc; border-color: #cddbe8; color: #4a6a8a; }
         .shift-indicator.si-green  { background: #f0fdf4; border-color: #1a7040; color: #1a7040; }
@@ -1588,6 +1604,11 @@ export default function App() {
               {shiftInfo.returnStr && (
                 <span className="si-return">Est. return {shiftInfo.returnStr}</span>
               )}
+            </div>
+            <div className="si-legend">
+              <span className="si-legend-item green">● &lt;12h</span>
+              <span className="si-legend-item yellow">● &lt;14h</span>
+              <span className="si-legend-item red">● &gt;14h</span>
             </div>
             </div>
           )}
