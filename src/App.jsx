@@ -166,7 +166,7 @@ function groundMin(miles) {
 }
 
 function flightMin(miles) {
-  return Math.round((miles / 172) * 60 + 10);
+  return Math.round((miles / 145) * 60 + 10);
 }
 
 function formatTime(mins) {
@@ -1447,7 +1447,7 @@ export default function App() {
               </div>
 
               <div className="disclaimer">
-                ⚠ Ground: road routing via Google Routes API (traffic-aware) · Air: straight-line 150 kts + 10 min ops · Estimates only — not for clinical decision-making
+                ⚠ Ground: road routing via Google Routes API (traffic-aware) · Air: straight-line 145 kts + 10 min ops · Estimates only — not for clinical decision-making
               </div>
             </div>
           ) : (
