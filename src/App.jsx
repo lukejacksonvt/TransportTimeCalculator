@@ -185,8 +185,30 @@ const FW_LIFT_MIN  = 30;
 const FW_OPS_MIN   = 10; // per flight leg overhead (departure + arrival)
 
 const AIRPORTS = [
-  { id: "bgr", code: "KBGR", name: "Bangor International Airport",    lat: 44.8074, lng: -68.8281 },
-  { id: "pwm", code: "KPWM", name: "Portland International Jetport",  lat: 43.6462, lng: -70.3087 },
+  // Maine
+  { id: "bgr", state: "ME", code: "KBGR", city: "Bangor",       lat: 44.8074, lng: -68.8281 },
+  { id: "pwm", state: "ME", code: "KPWM", city: "Portland",     lat: 43.6462, lng: -70.3087 },
+  { id: "pqi", state: "ME", code: "KPQI", city: "Presque Isle", lat: 46.6889, lng: -68.0447 },
+  { id: "fve", state: "ME", code: "KFVE", city: "Frenchville",  lat: 47.2855, lng: -68.3126 },
+  { id: "wvl", state: "ME", code: "KWVL", city: "Waterville",   lat: 44.5332, lng: -69.6755 },
+  { id: "bhb", state: "ME", code: "KBHB", city: "Bar Harbor",   lat: 44.4498, lng: -68.3616 },
+  { id: "mlt", state: "ME", code: "KMLT", city: "Millinocket",  lat: 45.6478, lng: -68.6856 },
+  { id: "old", state: "ME", code: "KOLD", city: "Old Town",     lat: 44.9527, lng: -68.6743 },
+  { id: "car", state: "ME", code: "KCAR", city: "Caribou",      lat: 46.8715, lng: -68.0179 },
+  { id: "hul", state: "ME", code: "KHUL", city: "Houlton",      lat: 46.1231, lng: -67.7921 },
+  { id: "pnn", state: "ME", code: "KPNN", city: "Princeton",    lat: 45.2065, lng: -67.5654 },
+  // Massachusetts
+  { id: "bos", state: "MA", code: "KBOS", city: "Boston",       lat: 42.3630, lng: -71.0052 },
+  { id: "orh", state: "MA", code: "KORH", city: "Worcester",    lat: 42.2673, lng: -71.8757 },
+  { id: "ack", state: "MA", code: "KACK", city: "Nantucket",    lat: 41.2531, lng: -70.0600 },
+  { id: "bed", state: "MA", code: "KBED", city: "Bedford",      lat: 42.4700, lng: -71.2890 },
+  // Vermont
+  { id: "btv", state: "VT", code: "KBTV", city: "Burlington",   lat: 44.4720, lng: -73.1533 },
+];
+const AIRPORT_STATES = [
+  { code: "ME", name: "Maine" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "VT", name: "Vermont" },
 ];
 
 function fwFlightMin(lat1, lng1, lat2, lng2) {
@@ -1477,7 +1499,13 @@ export default function App() {
                 <div className="sel-wrap">
                   <select value={sendingAirportId} onChange={e => setSendingAirportId(e.target.value)}>
                     <option value="">— Select airport —</option>
-                    {AIRPORTS.map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
+                    {AIRPORT_STATES.map(s => (
+                      <optgroup key={s.code} label={s.name}>
+                        {AIRPORTS.filter(a => a.state === s.code).map(a => (
+                          <option key={a.id} value={a.id}>{a.code} — {a.city}</option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1500,7 +1528,13 @@ export default function App() {
                 <div className="sel-wrap">
                   <select value={receivingAirportId} onChange={e => setReceivingAirportId(e.target.value)}>
                     <option value="">— Select airport —</option>
-                    {AIRPORTS.map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
+                    {AIRPORT_STATES.map(s => (
+                      <optgroup key={s.code} label={s.name}>
+                        {AIRPORTS.filter(a => a.state === s.code).map(a => (
+                          <option key={a.id} value={a.id}>{a.code} — {a.city}</option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
               </div>
