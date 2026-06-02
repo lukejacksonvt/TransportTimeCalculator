@@ -654,22 +654,17 @@ export default function App() {
   // Init map when div mounts and API is ready
   useEffect(() => {
     if (!isLoaded || !mapDivRef.current || mapInstanceRef.current) return;
-    // Defer by one frame so mobile browsers finish layout before Maps measures the container
-    const raf = requestAnimationFrame(() => {
-      if (!mapDivRef.current || mapInstanceRef.current) return;
-      mapInstanceRef.current = new window.google.maps.Map(mapDivRef.current, {
-        center: { lat: 44.5, lng: -69.5 },
-        zoom: 7,
-        styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
-        disableDefaultUI: true,
-        zoomControl: true,
-        gestureHandling: "cooperative",
-      });
-      // Trigger resize so Maps re-measures the container — fixes blank map on mobile
-      window.google.maps.event.trigger(mapInstanceRef.current, "resize");
-      setMapReady(true);
+    mapInstanceRef.current = new window.google.maps.Map(mapDivRef.current, {
+      center: { lat: 44.5, lng: -69.5 },
+      zoom: 7,
+      styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
+      disableDefaultUI: true,
+      zoomControl: true,
+      gestureHandling: "cooperative",
     });
-    return () => cancelAnimationFrame(raf);
+    // Force Maps to re-measure the container — fixes blank map on mobile
+    window.google.maps.event.trigger(mapInstanceRef.current, "resize");
+    setMapReady(true);
   }, [isLoaded, result, fwResult]);
 
   // Update map styles when theme changes
