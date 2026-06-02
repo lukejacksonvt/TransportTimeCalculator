@@ -197,6 +197,7 @@ const AIRPORTS = [
   { id: "car", state: "ME", code: "KCAR", city: "Caribou",      lat: 46.8715, lng: -68.0179 },
   { id: "hul", state: "ME", code: "KHUL", city: "Houlton",      lat: 46.1231, lng: -67.7921 },
   { id: "pnn", state: "ME", code: "KPNN", city: "Princeton",    lat: 45.2065, lng: -67.5654 },
+  { id: "lew", state: "ME", code: "KLEW", city: "Auburn",       lat: 44.0484, lng: -70.2835 },
   // Massachusetts
   { id: "bos", state: "MA", code: "KBOS", city: "Boston",       lat: 42.3630, lng: -71.0052 },
   { id: "orh", state: "MA", code: "KORH", city: "Worcester",    lat: 42.2673, lng: -71.8757 },
