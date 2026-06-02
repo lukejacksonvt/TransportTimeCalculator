@@ -654,15 +654,22 @@ export default function App() {
   // Init map when div mounts and API is ready
   useEffect(() => {
     if (!isLoaded || !mapDivRef.current || mapInstanceRef.current) return;
-    mapInstanceRef.current = new window.google.maps.Map(mapDivRef.current, {
-      center: { lat: 44.5, lng: -69.5 },
-      zoom: 7,
-      styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
-      disableDefaultUI: true,
-      zoomControl: true,
-      gestureHandling: "cooperative",
+    // Defer by one frame so mobile browsers finish layout before Maps measures the container
+    const raf = requestAnimationFrame(() => {
+      if (!mapDivRef.current || mapInstanceRef.current) return;
+      mapInstanceRef.current = new window.google.maps.Map(mapDivRef.current, {
+        center: { lat: 44.5, lng: -69.5 },
+        zoom: 7,
+        styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
+        disableDefaultUI: true,
+        zoomControl: true,
+        gestureHandling: "cooperative",
+      });
+      // Trigger resize so Maps re-measures the container — fixes blank map on mobile
+      window.google.maps.event.trigger(mapInstanceRef.current, "resize");
+      setMapReady(true);
     });
-    setMapReady(true);
+    return () => cancelAnimationFrame(raf);
   }, [isLoaded, result, fwResult]);
 
   // Update map styles when theme changes
@@ -1791,7 +1798,7 @@ export default function App() {
           <div className="map-wrap">
             <div
               ref={mapDivRef}
-              style={{ borderRadius: 4, overflow: "hidden", height: 320,
+              style={{ display: "block", width: "100%", borderRadius: 4, overflow: "hidden", height: 320,
                 border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
             />
             <div className="map-controls">
