@@ -856,6 +856,7 @@ export default function App() {
           padding: 28px 16px 48px;
         }
         .wrap { width: 100%; max-width: 580px; }
+        .layout { display: flex; flex-direction: column; gap: 0; }
 
         /* HEADER */
         .header { margin-bottom: 24px; }
@@ -1455,6 +1456,20 @@ export default function App() {
 
         /* MAP LAYER CONTROLS */
         .map-wrap { position: relative; margin-top: 16px; }
+        .map-canvas { display: block; width: 100%; height: 320px; border-radius: 4px; overflow: hidden; }
+
+        @media (min-width: 960px) {
+          .wrap { max-width: 1160px; }
+          .layout { flex-direction: row; align-items: flex-start; gap: 20px; }
+          .layout > .card { flex: 0 0 540px; }
+          .layout > .map-wrap {
+            flex: 1;
+            position: sticky;
+            top: 28px;
+            margin-top: 0;
+          }
+          .map-canvas { height: calc(100vh - 120px); min-height: 500px; }
+        }
         .map-controls {
           position: absolute;
           top: 8px; right: 8px;
@@ -1550,6 +1565,7 @@ export default function App() {
           </div>
         </div>
 
+        <div className="layout">
         <div className="card">
           <div className="bedside-row">
             <button
@@ -1969,8 +1985,8 @@ export default function App() {
           <div className="map-wrap">
             <div
               ref={mapDivRefCallback}
-              style={{ display: "block", width: "100%", borderRadius: 4, overflow: "hidden", height: 320,
-                border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
+              className="map-canvas"
+              style={{ border: `1px solid ${isDark ? "#152434" : "#dde6ef"}` }}
             />
             <div className="map-controls">
               <div className="weather-controls">
@@ -1989,6 +2005,7 @@ export default function App() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </>
   );
