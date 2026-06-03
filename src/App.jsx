@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { loadConfig } from "./config";
 
 const HOSPITALS = [
   // Maine
@@ -162,12 +163,12 @@ function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function groundMin(miles) {
-  return Math.round((miles * 1.35 / 55) * 60 + 5);
+function groundMin(miles, cfg) {
+  return Math.round((miles * cfg.groundWindingFactor / cfg.groundSpeedMph) * 60 + cfg.groundOpsMin);
 }
 
-function flightMin(miles) {
-  return Math.round((miles / 145) * 60 + 10);
+function flightMin(miles, cfg) {
+  return Math.round((miles / cfg.rotorSpeedKts) * 60 + cfg.rotorOpsMin);
 }
 
 function formatTime(mins) {
@@ -180,10 +181,10 @@ function formatTime(mins) {
 // Parse Routes API duration string e.g. "3600s" → 3600
 const parseSecs = s => parseInt(s) || 0;
 
-// Fixed Wing — King Air B200 with Raisbeck EPIC Platinum
+// Fixed Wing — King Air B200 with Raisbeck EPIC Platinum (defaults; overridden by config)
 const FW_SPEED_KTS = 270;
 const FW_LIFT_MIN  = 30;
-const FW_OPS_MIN   = 10; // per flight leg overhead (departure + arrival)
+const FW_OPS_MIN   = 10;
 
 const AIRPORTS = [
   // Maine
@@ -214,9 +215,9 @@ const AIRPORT_STATES = [
   { code: "VT", name: "Vermont" },
 ];
 
-function fwFlightMin(lat1, lng1, lat2, lng2) {
-  const nm = haversine(lat1, lng1, lat2, lng2) * 0.868976; // statute → nautical miles
-  return Math.round((nm / FW_SPEED_KTS) * 60 + FW_OPS_MIN);
+function fwFlightMin(lat1, lng1, lat2, lng2, cfg) {
+  const nm = haversine(lat1, lng1, lat2, lng2) * 0.868976;
+  return Math.round((nm / cfg.fwSpeedKts) * 60 + cfg.fwOpsMin);
 }
 
 const BASE_SHIFTS = {
@@ -227,8 +228,8 @@ const BASE_SHIFTS = {
   bangor_hangar: [{ start: 1900, end: 700  }, { start: 700,  end: 1900 }],
 };
 
-function getActiveShift(baseId, now) {
-  const shifts = BASE_SHIFTS[baseId];
+function getActiveShift(baseId, now, baseShifts) {
+  const shifts = baseShifts[baseId];
   if (!shifts) return null;
   const nowMins = now.getHours() * 60 + now.getMinutes();
   for (const { start, end } of shifts) {
@@ -311,8 +312,8 @@ async function computeRoute(origin, waypoints, destination) {
 }
 
 
-function calcLegs(base, sending, receiving, mode) {
-  const timeFn = mode === "air" ? flightMin : groundMin;
+function calcLegs(base, sending, receiving, mode, cfg) {
+  const timeFn = mode === "air" ? (m) => flightMin(m, cfg) : (m) => groundMin(m, cfg);
 
   const dist = (a, b) => haversine(a.lat, a.lng, b.lat, b.lng);
 
@@ -354,20 +355,22 @@ function calcLegs(base, sending, receiving, mode) {
 
 const LOAD_TIME = (() => { const d = new Date(); return `${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}`; })();
 
-function HospitalSelect({ value, onChange, placeholder, exclude, pinnedIds }) {
+function HospitalSelect({ value, onChange, placeholder, exclude, pinnedIds, hospitals = HOSPITALS }) {
   const [open, setOpen] = useState(false);
   const [meOpen, setMeOpen] = useState(false);
   const [nhOpen, setNhOpen] = useState(false);
   const [maOpen, setMaOpen] = useState(false);
+  const [otherOpen, setOtherOpen] = useState(false);
   const ref = useRef(null);
 
-  const available = exclude ? HOSPITALS.filter(h => h.id !== exclude) : HOSPITALS;
+  const available = exclude ? hospitals.filter(h => h.id !== exclude) : hospitals;
   const pinnedSet = new Set(pinnedIds || []);
   const pinned = pinnedIds ? pinnedIds.map(id => available.find(h => h.id === id)).filter(Boolean) : [];
-  const me = available.filter(h => h.state === "ME" && !pinnedSet.has(h.id));
-  const nh = available.filter(h => h.state === "NH");
-  const ma = available.filter(h => h.state === "MA");
-  const selected = HOSPITALS.find(h => h.id === value);
+  const me    = available.filter(h => h.state === "ME" && !pinnedSet.has(h.id));
+  const nh    = available.filter(h => h.state === "NH");
+  const ma    = available.filter(h => h.state === "MA");
+  const other = available.filter(h => !["ME","NH","MA"].includes(h.state) && !pinnedSet.has(h.id));
+  const selected = hospitals.find(h => h.id === value);
 
   useEffect(() => {
     const handler = e => { if (!ref.current?.contains(e.target)) setOpen(false); };
@@ -423,6 +426,12 @@ function HospitalSelect({ value, onChange, placeholder, exclude, pinnedIds }) {
             <span>Massachusetts</span><span>{maOpen ? "▴" : "▾"}</span>
           </button>
           {maOpen && ma.map(renderOption)}
+          {other.length > 0 && <>
+            <button type="button" className="hsel-state-toggle" onClick={() => setOtherOpen(o => !o)}>
+              <span>Other</span><span>{otherOpen ? "▴" : "▾"}</span>
+            </button>
+            {otherOpen && other.map(renderOption)}
+          </>}
         </div>
       )}
     </div>
@@ -439,8 +448,10 @@ export default function App() {
   const [fuelStopAirportId, setFuelStopAirportId] = useState("");
 
   // --- all state up front ---
+  const [cfg] = useState(() => loadConfig());
   const [isDark, setIsDark] = useState(() => { const s = localStorage.getItem("theme"); return s ? s === "dark" : isDarkHour(); });
   const [now, setNow] = useState(() => new Date());
+  const [includeCmmcStop, setIncludeCmmcStop] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [groundRoute, setGroundRoute] = useState(null);
@@ -454,24 +465,28 @@ export default function App() {
   const [showTraffic, setShowTraffic] = useState(true);
   const [hospitalWeather, setHospitalWeather] = useState({});
 
+  const allHospitals = useMemo(() => [...HOSPITALS, ...cfg.customHospitals], [cfg]);
+  const allAirports  = useMemo(() => [...AIRPORTS,  ...cfg.customAirports],  [cfg]);
+
   const fixedBase = BASES.find(b => b.id === baseId);
   const base = baseId === "current"
     ? (currentPos ? { id: "current", name: "Current Location", city: "Current Location", lat: currentPos.lat, lng: currentPos.lng, restockId: null } : null)
     : fixedBase;
-  const sending = HOSPITALS.find(h => h.id === sendingId);
-  const receiving = HOSPITALS.find(h => h.id === receivingId);
+  const sending   = allHospitals.find(h => h.id === sendingId);
+  const receiving = allHospitals.find(h => h.id === receivingId);
 
   // --- derived values ---
   const valid = base && sending && receiving && sendingId !== receivingId;
   const isRodman = base?.restockId != null;
   const legMeta = groundRoute ? "road routing" : "transit";
+  const cmmcAdd = isRodman && includeCmmcStop ? cfg.cmmcStopMin : 0;
 
   const bedsideTotal = bedsideMin * 2;
-  const haverResult = (valid && mode !== "fw") ? calcLegs(base, sending, receiving, mode) : null;
+  const haverResult = (valid && mode !== "fw") ? calcLegs(base, sending, receiving, mode, cfg) : null;
   const result = (() => {
     if (!haverResult) return null;
     if (mode !== "ground" || !groundRoute) {
-      return { ...haverResult, total: haverResult.transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
+      return { ...haverResult, total: haverResult.transit + bedsideTotal + cmmcAdd };
     }
     const apiLegs = groundRoute.legs;
     const updatedLegs = haverResult.legs.map((leg, i) => ({
@@ -480,21 +495,21 @@ export default function App() {
       miles: apiLegs[i] ? Math.round((apiLegs[i].distanceMeters ?? 0) / 1609.34) : leg.miles,
     }));
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
-    return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
+    return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + cmmcAdd };
   })();
 
   // Fuel stop (rotor only) — splits the transport leg through an intermediate airport
   const fuelStop = (() => {
     if (mode !== "air" || !hasFuelStop || !fuelStopAirportId || !valid) return null;
-    const fsa = AIRPORTS.find(a => a.id === fuelStopAirportId);
+    const fsa = allAirports.find(a => a.id === fuelStopAirportId);
     if (!fsa) return null;
     const m1 = haversine(sending.lat, sending.lng, fsa.lat, fsa.lng);
     const m2 = haversine(fsa.lat, fsa.lng, receiving.lat, receiving.lng);
     return {
       airport: fsa,
-      leg1: { label: `${sending.city} → ${fsa.code}`, miles: Math.round(m1), time: flightMin(m1) },
-      leg2: { label: `${fsa.code} → ${receiving.city}`, miles: Math.round(m2), time: flightMin(m2) },
-      stopMin: 10,
+      leg1: { label: `${sending.city} → ${fsa.code}`, miles: Math.round(m1), time: flightMin(m1, cfg) },
+      leg2: { label: `${fsa.code} → ${receiving.city}`, miles: Math.round(m2), time: flightMin(m2, cfg) },
+      stopMin: cfg.fuelStopMin,
     };
   })();
 
@@ -507,9 +522,9 @@ export default function App() {
 
   const fwResult = (() => {
     if (mode !== "fw" || !valid || !sendingAirportId || !receivingAirportId) return null;
-    const sendApt  = AIRPORTS.find(a => a.id === sendingAirportId);
-    const recvApt  = AIRPORTS.find(a => a.id === receivingAirportId);
-    const bgrApt   = AIRPORTS.find(a => a.id === "bgr");
+    const sendApt  = allAirports.find(a => a.id === sendingAirportId);
+    const recvApt  = allAirports.find(a => a.id === receivingAirportId);
+    const bgrApt   = allAirports.find(a => a.id === "bgr");
     const isBgrBoth = sendingAirportId === "bgr" && receivingAirportId === "bgr";
     const sameApt   = sendingAirportId === receivingAirportId;
     const gl = fwGroundLegs;
@@ -519,7 +534,7 @@ export default function App() {
       key,
       toCoord: { lat: tLat, lng: tLng },
       label: `Ground · ${from} → ${to}`,
-      time:  gl?.[key]?.time  ?? groundMin(haversine(fLat, fLng, tLat, tLng)),
+      time:  gl?.[key]?.time  ?? groundMin(haversine(fLat, fLng, tLat, tLng), cfg),
       miles: gl?.[key]?.miles ?? Math.round(haversine(fLat, fLng, tLat, tLng)),
       live: !!gl?.[key]?.time,
     });
@@ -527,12 +542,12 @@ export default function App() {
       type: "flight",
       toCoord: { lat: b.lat, lng: b.lng },
       label: `Flight · ${a.code} → ${b.code}`,
-      time:  fwFlightMin(a.lat, a.lng, b.lat, b.lng),
+      time:  fwFlightMin(a.lat, a.lng, b.lat, b.lng, cfg),
       miles: Math.round(haversine(a.lat, a.lng, b.lat, b.lng) * 0.868976),
     });
 
     const legs = [];
-    legs.push({ type: "lift", label: "Lift · 600 Hangar (KBGR)", time: FW_LIFT_MIN });
+    legs.push({ type: "lift", label: "Lift · 600 Hangar (KBGR)", time: cfg.fwLiftMin });
     if (sendingAirportId !== "bgr") legs.push(fLeg(bgrApt, sendApt));
     legs.push(gLeg("aptToSend", sendApt.code, sending.city, sendApt.lat, sendApt.lng, sending.lat, sending.lng));
     legs.push({ type: "bedside", side: "sending", hospital: sending, time: bedsideMin });
@@ -554,7 +569,7 @@ export default function App() {
   const shiftInfo = (() => {
     const shiftBaseId = baseId === "current" ? crewBaseId : baseId;
     if (!shiftBaseId) return null;
-    const active = getActiveShift(shiftBaseId, now);
+    const active = getActiveShift(shiftBaseId, now, cfg.baseShifts);
     if (!active) return { status: "none" };
     const activeResult = mode === "fw" ? fwResult : (resultWithFuelStop ?? result);
     if (!activeResult) return { status: "idle", label: active.label };
@@ -1215,6 +1230,11 @@ export default function App() {
         .app-root.night .weather-btn.active { background: rgba(15,36,26,.92); }
         .app-root.night .traffic-toggle.active.traffic { background: rgba(40,20,5,.92); }
 
+        /* ADMIN LINK */
+        .admin-link-row { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); text-align: right; }
+        .admin-link { font-family: 'Spline Sans Mono', monospace; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); text-decoration: none; }
+        .admin-link:hover { color: var(--text-2); }
+
         /* TRANSITIONS */
         .app-root, .card, select, .mode-btn, .total-box, .leg-dot, .bedside-dot {
           transition: background 0.4s, color 0.4s, border-color 0.4s;
@@ -1249,7 +1269,7 @@ export default function App() {
               <div className="sec-label">Bedside Time</div>
               <div className="sel-wrap">
                 <select value={bedsideMin} onChange={e => setBedsideMin(Number(e.target.value))}>
-                  {BEDSIDE_PRESETS.map(p => (
+                  {cfg.bedsidePresets.map(p => (
                     <option key={p.min} value={p.min}>{p.label}</option>
                   ))}
                 </select>
@@ -1293,6 +1313,7 @@ export default function App() {
                 value={sendingId}
                 onChange={setSendingId}
                 placeholder="— Select sending hospital —"
+                hospitals={allHospitals}
               />
             </div>
 
@@ -1304,7 +1325,7 @@ export default function App() {
                     <option value="">— Select airport —</option>
                     {AIRPORT_STATES.map(s => (
                       <optgroup key={s.code} label={s.name}>
-                        {AIRPORTS.filter(a => a.state === s.code).map(a => (
+                        {allAirports.filter(a => a.state === s.code).map(a => (
                           <option key={a.id} value={a.id}>{a.code} — {a.city}</option>
                         ))}
                       </optgroup>
@@ -1322,6 +1343,7 @@ export default function App() {
                 placeholder="— Select receiving hospital —"
                 exclude={sendingId}
                 pinnedIds={["mmmc", "emmc", "cmmc"]}
+                hospitals={allHospitals}
               />
             </div>
 
@@ -1333,7 +1355,7 @@ export default function App() {
                     <option value="">— Select airport —</option>
                     {AIRPORT_STATES.map(s => (
                       <optgroup key={s.code} label={s.name}>
-                        {AIRPORTS.filter(a => a.state === s.code).map(a => (
+                        {allAirports.filter(a => a.state === s.code).map(a => (
                           <option key={a.id} value={a.id}>{a.code} — {a.city}</option>
                         ))}
                       </optgroup>
@@ -1361,6 +1383,15 @@ export default function App() {
             >Fixed Wing</button>
           </div>
 
+          {isRodman && mode !== "fw" && (
+            <div className="fuel-stop-row">
+              <button
+                className={`fuel-stop-toggle${includeCmmcStop ? " active" : ""}`}
+                onClick={() => setIncludeCmmcStop(v => !v)}
+              >{includeCmmcStop ? `⬤ CMMC Stop +${cfg.cmmcStopMin} min` : "CMMC Stop (excluded)"}</button>
+            </div>
+          )}
+
           {mode === "air" && (
             <div className="fuel-stop-row">
               <button
@@ -1374,7 +1405,7 @@ export default function App() {
                       <option value="">— Select airport —</option>
                       {AIRPORT_STATES.map(s => (
                         <optgroup key={s.code} label={s.name}>
-                          {AIRPORTS.filter(a => a.state === s.code).map(a => (
+                          {allAirports.filter(a => a.state === s.code).map(a => (
                             <option key={a.id} value={a.id}>{a.code} — {a.city}</option>
                           ))}
                         </optgroup>
@@ -1505,7 +1536,7 @@ export default function App() {
                 </div>
 
                 <div className="disclaimer">
-                  ⚠ Fixed Wing: straight-line {FW_SPEED_KTS} kts + {FW_OPS_MIN} min ops per leg · Ground transfers via Google Routes API · Estimates only — not for clinical decision-making
+                  ⚠ Fixed Wing: straight-line {cfg.fwSpeedKts} kts + {cfg.fwOpsMin} min ops per leg · Ground transfers via Google Routes API · Estimates only — not for clinical decision-making
                 </div>
               </div>
             ) : (
@@ -1534,7 +1565,7 @@ export default function App() {
                 <div className={`total-box highlight${mode === "air" ? " air" : ""}`}>
                   <div className={`total-label ${mode === "air" ? "green" : "gold"}`}>Total Mission</div>
                   <div className="total-value">{formatTime(activeResult.total)}</div>
-                  <div className="total-breakdown">Transit + {bedsideTotal} min bedside{isRodman ? " + 15 min CMMC" : ""}{activeResult.fuelStop ? " + 10 min fuel" : ""}</div>
+                  <div className="total-breakdown">Transit + {bedsideTotal} min bedside{isRodman && includeCmmcStop ? ` + ${cfg.cmmcStopMin} min CMMC` : ""}{activeResult.fuelStop ? ` + ${cfg.fuelStopMin} min fuel` : ""}</div>
                 </div>
               </div>
 
@@ -1669,7 +1700,7 @@ export default function App() {
               </div>
 
               <div className="disclaimer">
-                ⚠ Ground: road routing via Google Routes API (traffic-aware) · Rotor: straight-line 145 kts + 10 min ops · Estimates only — not for clinical decision-making
+                ⚠ Ground: road routing via Google Routes API (traffic-aware) · Rotor: straight-line {cfg.rotorSpeedKts} kts + {cfg.rotorOpsMin} min ops · Estimates only — not for clinical decision-making
               </div>
             </div>
           ) : (
@@ -1679,6 +1710,9 @@ export default function App() {
                 : "Select base, sending hospital, and receiving hospital"}
             </div>
           )}
+          <div className="admin-link-row">
+            <a href="#/admin" className="admin-link">⚙ Admin Settings</a>
+          </div>
         </div>
 
         {isLoaded && (activeResult || fwResult) && (
