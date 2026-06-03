@@ -915,14 +915,15 @@ export default function App() {
         .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
         .clock { font-family: 'Spline Sans Mono', monospace; font-size: 22px; font-weight: 600; color: var(--text); letter-spacing: 0.04em; line-height: 1; }
         .header-actions { display: flex; align-items: center; gap: 6px; }
-        .theme-toggle {
-          font-family: 'Spline Sans Mono', monospace;
-          font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
-          background: var(--surface); border: 1px solid var(--border-strong);
-          color: var(--text-2); border-radius: 99px; padding: 5px 12px;
-          cursor: pointer; transition: all 0.18s;
-        }
-        .theme-toggle:hover { border-color: var(--gold); color: var(--gold); }
+        /* THEME SWITCH */
+        .theme-switch { display: flex; align-items: center; gap: 5px; background: none; border: none; padding: 0; cursor: pointer; }
+        .ts-label { font-family: 'Spline Sans Mono', monospace; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); transition: color 0.2s; user-select: none; }
+        .theme-switch:not(.night) .ts-day  { color: var(--gold); font-weight: 600; }
+        .theme-switch.night .ts-night { color: var(--green); font-weight: 600; }
+        .ts-track { width: 30px; height: 17px; border-radius: 99px; background: var(--border-strong); border: 1px solid var(--border-strong); position: relative; transition: background 0.25s, border-color 0.25s; flex-shrink: 0; }
+        .theme-switch.night .ts-track { background: var(--green-tint); border-color: var(--green); }
+        .ts-knob { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--text-muted); transition: transform 0.25s, background 0.25s; }
+        .theme-switch.night .ts-knob { transform: translateX(13px); background: var(--green); }
         .reset-pill {
           font-family: 'Spline Sans Mono', monospace;
           font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
@@ -1049,10 +1050,11 @@ export default function App() {
         .fuel-stop-stop { display: flex; align-items: stretch; gap: 0; }
         .fuel-stop-connector { display: flex; flex-direction: column; align-items: center; width: 28px; flex-shrink: 0; padding: 2px 0; }
         .fuel-stop-dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--green); background: var(--green-tint); flex-shrink: 0; z-index: 1; }
-        .fuel-stop-content { flex: 1; padding: 5px 0 14px 8px; }
+        .fuel-stop-content { flex: 1; padding: 4px 0 8px 8px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .fuel-stop-text { flex: 1; min-width: 0; }
         .fuel-stop-label { font-size: 11px; font-family: 'Spline Sans Mono', monospace; letter-spacing: .14em; color: var(--green); text-transform: uppercase; }
         .fuel-stop-name { font-family: 'Saira', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-2); margin-top: 1px; }
-        .fuel-stop-time { font-family: 'Spline Sans Mono', monospace; font-size: 18px; font-weight: 600; color: var(--text); margin-top: 1px; }
+        .fuel-stop-time { font-family: 'Spline Sans Mono', monospace; font-size: 18px; font-weight: 600; color: var(--text); white-space: nowrap; padding-top: 1px; flex-shrink: 0; }
 
         /* SHIFT INDICATOR */
         .shift-indicator {
@@ -1099,10 +1101,11 @@ export default function App() {
         .leg-dot.green { border-color: var(--green); }
         .leg-dot.dim   { border-color: var(--border-strong); }
         .leg-line { flex: 1; width: 1px; background: var(--border); margin: 2px 0; }
-        .leg-content { flex: 1; padding: 6px 0 14px 8px; }
+        .leg-content { flex: 1; padding: 4px 0 8px 8px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .leg-text { flex: 1; min-width: 0; }
         .leg-route { font-family: 'Saira', sans-serif; font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: .04em; }
         .leg-meta { font-family: 'Spline Sans Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 2px; }
-        .leg-time { font-family: 'Spline Sans Mono', monospace; font-size: 18px; font-weight: 600; color: var(--text); margin-top: 1px; }
+        .leg-time { font-family: 'Spline Sans Mono', monospace; font-size: 18px; font-weight: 600; color: var(--text); white-space: nowrap; padding-top: 1px; flex-shrink: 0; }
 
         /* BEDSIDE STOPS */
         .bedside-stop { display: flex; align-items: stretch; gap: 0; }
@@ -1116,11 +1119,12 @@ export default function App() {
         }
         .bedside-dot.receiving { background: var(--green-tint); border-color: var(--green); color: var(--green-deep); }
         .bedside-line { flex: 1; width: 1px; background: var(--border); margin: 2px 0; }
-        .bedside-content { flex: 1; padding: 4px 0 14px 8px; }
+        .bedside-content { flex: 1; padding: 4px 0 8px 8px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .bedside-text { flex: 1; min-width: 0; }
         .bedside-label { font-size: 11px; font-family: 'Spline Sans Mono', monospace; letter-spacing: .14em; color: var(--gold-deep); text-transform: uppercase; }
         .bedside-label.receiving { color: var(--green); }
         .bedside-name { font-family: 'Saira', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-2); margin-top: 1px; }
-        .bedside-time { font-family: 'Spline Sans Mono', monospace; font-size: 18px; font-weight: 600; color: var(--text); margin-top: 1px; }
+        .bedside-time { font-family: 'Spline Sans Mono', monospace; font-size: 18px; font-weight: 600; color: var(--text); white-space: nowrap; padding-top: 1px; flex-shrink: 0; }
 
         /* RESTOCK BADGE */
         .restock-badge {
@@ -1132,7 +1136,7 @@ export default function App() {
         }
 
         /* TOTALS */
-        .totals { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .totals { margin-bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .total-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px; }
         .total-box.highlight { border-color: var(--gold); background: var(--gold-tint); }
         .total-box.highlight.air { border-color: var(--green); background: var(--green-tint); }
@@ -1150,7 +1154,8 @@ export default function App() {
         .live-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: var(--r-sm); padding: 3px 8px; font-family: 'Spline Sans Mono', monospace; font-size: 9px; letter-spacing: .18em; text-transform: uppercase; background: var(--green-tint); border: 1px solid var(--green); color: var(--green); }
 
         /* BEDSIDE SELECTOR */
-        .bedside-row { display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 16px; }
+        .bedside-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .bedside-left { display: flex; align-items: center; padding-top: 18px; }
         .bedside-selector { width: 162px; }
         .bedside-hint { font-family: 'Spline Sans Mono', monospace; font-size: 8px; letter-spacing: .12em; color: var(--text-muted); margin-top: 4px; text-align: right; }
 
@@ -1225,10 +1230,7 @@ export default function App() {
             </div>
             <div className="header-right">
               <div className="clock">{String(now.getHours()).padStart(2,"0")}{String(now.getMinutes()).padStart(2,"0")}</div>
-              <div className="header-actions">
-                <button className="theme-toggle" onClick={toggleTheme}>{isDark ? "Daylight" : "Night"}</button>
-                <button className="reset-pill" onClick={() => window.location.reload()}>Reset</button>
-              </div>
+              <button className="reset-pill" onClick={() => window.location.reload()}>Reset</button>
             </div>
           </div>
         </div>
@@ -1236,6 +1238,13 @@ export default function App() {
         <div className="layout">
         <div className="card">
           <div className="bedside-row">
+            <div className="bedside-left">
+              <button className={`theme-switch${isDark ? " night" : ""}`} onClick={toggleTheme} aria-label="Toggle day/night mode">
+                <span className="ts-label ts-day">Day</span>
+                <span className="ts-track"><span className="ts-knob" /></span>
+                <span className="ts-label ts-night">Night</span>
+              </button>
+            </div>
             <div className="bedside-selector">
               <div className="sec-label">Bedside Time</div>
               <div className="sel-wrap">
@@ -1405,6 +1414,20 @@ export default function App() {
             fwResult ? (
               <div className="profile" key={`fw-${sendingId}-${receivingId}-${sendingAirportId}-${receivingAirportId}`}>
                 <div className="divider">Mission Profile</div>
+
+                <div className="totals">
+                  <div className="total-box">
+                    <div className="total-label">Transit Only</div>
+                    <div className="total-value">{formatTime(fwResult.transit)}</div>
+                    <div className="total-breakdown">Lift + flights + ground</div>
+                  </div>
+                  <div className="total-box highlight fw">
+                    <div className="total-label blue">Total Mission</div>
+                    <div className="total-value">{formatTime(fwResult.total)}</div>
+                    <div className="total-breakdown">Transit + {bedsideTotal} min bedside</div>
+                  </div>
+                </div>
+
                 <div className="legs">
                   {fwResult.legs.map((leg, i) => {
                     const isLast = i === fwResult.legs.length - 1;
@@ -1418,8 +1441,10 @@ export default function App() {
                             <div className="bedside-line" />
                           </div>
                           <div className="bedside-content">
-                            <div className={`bedside-label${isSending ? "" : " receiving"}`}>Bedside · {isSending ? "Sending" : "Receiving"}</div>
-                            <div className="bedside-name">{leg.hospital.name}</div>
+                            <div className="bedside-text">
+                              <div className={`bedside-label${isSending ? "" : " receiving"}`}>Bedside · {isSending ? "Sending" : "Receiving"}</div>
+                              <div className="bedside-name">{leg.hospital.name}</div>
+                            </div>
                             <div className="bedside-time">{formatTime(leg.time)}</div>
                           </div>
                         </div>
@@ -1433,8 +1458,10 @@ export default function App() {
                             <div className="leg-line" />
                           </div>
                           <div className="leg-content">
-                            <div className="leg-route">{leg.label}</div>
-                            <div className="leg-meta fw">Crew ready · pre-mission setup</div>
+                            <div className="leg-text">
+                              <div className="leg-route">{leg.label}</div>
+                              <div className="leg-meta fw">Crew ready · pre-mission setup</div>
+                            </div>
                             <div className="leg-time fw">{formatTime(leg.time)}</div>
                           </div>
                         </div>
@@ -1449,8 +1476,10 @@ export default function App() {
                             {nextIsBedside && <div className="leg-line" />}
                           </div>
                           <div className="leg-content">
-                            <div className="leg-route">{leg.label}</div>
-                            <div className="leg-meta fw">{leg.miles} nm · {FW_SPEED_KTS} kts</div>
+                            <div className="leg-text">
+                              <div className="leg-route">{leg.label}</div>
+                              <div className="leg-meta fw">{leg.miles} nm · {FW_SPEED_KTS} kts</div>
+                            </div>
                             <div className="leg-time fw">{formatTime(leg.time)}</div>
                           </div>
                         </div>
@@ -1464,26 +1493,15 @@ export default function App() {
                           {(!isLast) && <div className="leg-line" />}
                         </div>
                         <div className="leg-content">
-                          <div className="leg-route">{leg.label}</div>
-                          <div className="leg-meta">{leg.miles} mi · {leg.live ? "road routing" : "transit"}</div>
+                          <div className="leg-text">
+                            <div className="leg-route">{leg.label}</div>
+                            <div className="leg-meta">{leg.miles} mi · {leg.live ? "road routing" : "transit"}</div>
+                          </div>
                           <div className="leg-time">{formatTime(leg.time)}</div>
                         </div>
                       </div>
                     );
                   })}
-                </div>
-
-                <div className="totals">
-                  <div className="total-box">
-                    <div className="total-label">Transit Only</div>
-                    <div className="total-value">{formatTime(fwResult.transit)}</div>
-                    <div className="total-breakdown">Lift + flights + ground</div>
-                  </div>
-                  <div className="total-box highlight fw">
-                    <div className="total-label blue">Total Mission</div>
-                    <div className="total-value">{formatTime(fwResult.total)}</div>
-                    <div className="total-breakdown">Transit + {bedsideTotal} min bedside</div>
-                  </div>
                 </div>
 
                 <div className="disclaimer">
@@ -1507,118 +1525,6 @@ export default function App() {
                 </div>
               )}
 
-              <div className="legs">
-                <div className="leg">
-                  <div className="leg-connector">
-                    <div className="leg-dot dim" />
-                    <div className="leg-line" />
-                  </div>
-                  <div className="leg-content">
-                    <div className="leg-route">{result.legs[0].label}</div>
-                    <div className="leg-meta">{result.legs[0].miles} mi · {legMeta}</div>
-                    <div className="leg-time">{formatTime(result.legs[0].time)}</div>
-                  </div>
-                </div>
-
-                <div className="bedside-stop">
-                  <div className="bedside-connector">
-                    <div className="bedside-dot">+</div>
-                    <div className="bedside-line" />
-                  </div>
-                  <div className="bedside-content">
-                    <div className="bedside-label">Bedside · Sending</div>
-                    <div className="bedside-name">{sending.name}</div>
-                    <div className="bedside-time">{formatTime(bedsideMin)}</div>
-                  </div>
-                </div>
-
-                {activeResult?.fuelStop ? (<>
-                  <div className="leg">
-                    <div className="leg-connector">
-                      <div className="leg-dot dim" />
-                      <div className="leg-line" />
-                    </div>
-                    <div className="leg-content">
-                      <div className="leg-route">{activeResult.fuelStop.leg1.label}</div>
-                      <div className="leg-meta">{activeResult.fuelStop.leg1.miles} mi · rotor</div>
-                      <div className="leg-time">{formatTime(activeResult.fuelStop.leg1.time)}</div>
-                    </div>
-                  </div>
-                  <div className="fuel-stop-stop">
-                    <div className="fuel-stop-connector">
-                      <div className="fuel-stop-dot" />
-                      <div className="leg-line" />
-                    </div>
-                    <div className="fuel-stop-content">
-                      <div className="fuel-stop-label">Fuel Stop · {activeResult.fuelStop.airport.code}</div>
-                      <div className="fuel-stop-name">{activeResult.fuelStop.airport.city}</div>
-                      <div className="fuel-stop-time">{formatTime(activeResult.fuelStop.stopMin)}</div>
-                    </div>
-                  </div>
-                  <div className="leg">
-                    <div className="leg-connector">
-                      <div className="leg-dot dim" />
-                      <div className="leg-line" />
-                    </div>
-                    <div className="leg-content">
-                      <div className="leg-route">{activeResult.fuelStop.leg2.label}</div>
-                      <div className="leg-meta">{activeResult.fuelStop.leg2.miles} mi · rotor</div>
-                      <div className="leg-time">{formatTime(activeResult.fuelStop.leg2.time)}</div>
-                    </div>
-                  </div>
-                </>) : (
-                <div className="leg">
-                  <div className="leg-connector">
-                    <div className="leg-dot dim" />
-                    <div className="leg-line" />
-                  </div>
-                  <div className="leg-content">
-                    <div className="leg-route">{result.legs[1].label}</div>
-                    <div className="leg-meta">{result.legs[1].miles} mi · {legMeta}</div>
-                    <div className="leg-time">{formatTime(result.legs[1].time)}</div>
-                  </div>
-                </div>
-                )}
-
-                <div className="bedside-stop">
-                  <div className="bedside-connector">
-                    <div className="bedside-dot receiving">+</div>
-                    <div className="bedside-line" />
-                  </div>
-                  <div className="bedside-content">
-                    <div className="bedside-label receiving">Bedside · Receiving</div>
-                    <div className="bedside-name">{receiving.name}</div>
-                    <div className="bedside-time">{formatTime(bedsideMin)}</div>
-                  </div>
-                </div>
-
-                <div className="leg">
-                  <div className="leg-connector">
-                    <div className="leg-dot dim" />
-                    {isRodman && <div className="leg-line" />}
-                  </div>
-                  <div className="leg-content">
-                    <div className="leg-route">{result.legs[2].label}</div>
-                    <div className="leg-meta">{result.legs[2].miles} mi · {legMeta}</div>
-                    <div className="leg-time">{formatTime(result.legs[2].time)}</div>
-                    {isRodman && <div className="restock-badge">⟳ Restock at CMMC</div>}
-                  </div>
-                </div>
-
-                {isRodman && result.legs[3] && (
-                  <div className="leg">
-                    <div className="leg-connector">
-                      <div className="leg-dot green" />
-                    </div>
-                    <div className="leg-content">
-                      <div className="leg-route">{result.legs[3].label}</div>
-                      <div className="leg-meta">{result.legs[3].miles} mi · return to base</div>
-                      <div className="leg-time">{formatTime(result.legs[3].time)}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <div className="totals">
                 <div className="total-box">
                   <div className="total-label">Transit Only</div>
@@ -1630,6 +1536,136 @@ export default function App() {
                   <div className="total-value">{formatTime(activeResult.total)}</div>
                   <div className="total-breakdown">Transit + {bedsideTotal} min bedside{isRodman ? " + 15 min CMMC" : ""}{activeResult.fuelStop ? " + 10 min fuel" : ""}</div>
                 </div>
+              </div>
+
+              <div className="legs">
+                <div className="leg">
+                  <div className="leg-connector">
+                    <div className="leg-dot dim" />
+                    <div className="leg-line" />
+                  </div>
+                  <div className="leg-content">
+                    <div className="leg-text">
+                      <div className="leg-route">{result.legs[0].label}</div>
+                      <div className="leg-meta">{result.legs[0].miles} mi · {legMeta}</div>
+                    </div>
+                    <div className="leg-time">{formatTime(result.legs[0].time)}</div>
+                  </div>
+                </div>
+
+                <div className="bedside-stop">
+                  <div className="bedside-connector">
+                    <div className="bedside-dot">+</div>
+                    <div className="bedside-line" />
+                  </div>
+                  <div className="bedside-content">
+                    <div className="bedside-text">
+                      <div className="bedside-label">Bedside · Sending</div>
+                      <div className="bedside-name">{sending.name}</div>
+                    </div>
+                    <div className="bedside-time">{formatTime(bedsideMin)}</div>
+                  </div>
+                </div>
+
+                {activeResult?.fuelStop ? (<>
+                  <div className="leg">
+                    <div className="leg-connector">
+                      <div className="leg-dot dim" />
+                      <div className="leg-line" />
+                    </div>
+                    <div className="leg-content">
+                      <div className="leg-text">
+                        <div className="leg-route">{activeResult.fuelStop.leg1.label}</div>
+                        <div className="leg-meta">{activeResult.fuelStop.leg1.miles} mi · rotor</div>
+                      </div>
+                      <div className="leg-time">{formatTime(activeResult.fuelStop.leg1.time)}</div>
+                    </div>
+                  </div>
+                  <div className="fuel-stop-stop">
+                    <div className="fuel-stop-connector">
+                      <div className="fuel-stop-dot" />
+                      <div className="leg-line" />
+                    </div>
+                    <div className="fuel-stop-content">
+                      <div className="fuel-stop-text">
+                        <div className="fuel-stop-label">Fuel Stop · {activeResult.fuelStop.airport.code}</div>
+                        <div className="fuel-stop-name">{activeResult.fuelStop.airport.city}</div>
+                      </div>
+                      <div className="fuel-stop-time">{formatTime(activeResult.fuelStop.stopMin)}</div>
+                    </div>
+                  </div>
+                  <div className="leg">
+                    <div className="leg-connector">
+                      <div className="leg-dot dim" />
+                      <div className="leg-line" />
+                    </div>
+                    <div className="leg-content">
+                      <div className="leg-text">
+                        <div className="leg-route">{activeResult.fuelStop.leg2.label}</div>
+                        <div className="leg-meta">{activeResult.fuelStop.leg2.miles} mi · rotor</div>
+                      </div>
+                      <div className="leg-time">{formatTime(activeResult.fuelStop.leg2.time)}</div>
+                    </div>
+                  </div>
+                </>) : (
+                <div className="leg">
+                  <div className="leg-connector">
+                    <div className="leg-dot dim" />
+                    <div className="leg-line" />
+                  </div>
+                  <div className="leg-content">
+                    <div className="leg-text">
+                      <div className="leg-route">{result.legs[1].label}</div>
+                      <div className="leg-meta">{result.legs[1].miles} mi · {legMeta}</div>
+                    </div>
+                    <div className="leg-time">{formatTime(result.legs[1].time)}</div>
+                  </div>
+                </div>
+                )}
+
+                <div className="bedside-stop">
+                  <div className="bedside-connector">
+                    <div className="bedside-dot receiving">+</div>
+                    <div className="bedside-line" />
+                  </div>
+                  <div className="bedside-content">
+                    <div className="bedside-text">
+                      <div className="bedside-label receiving">Bedside · Receiving</div>
+                      <div className="bedside-name">{receiving.name}</div>
+                    </div>
+                    <div className="bedside-time">{formatTime(bedsideMin)}</div>
+                  </div>
+                </div>
+
+                <div className="leg">
+                  <div className="leg-connector">
+                    <div className="leg-dot dim" />
+                    {isRodman && <div className="leg-line" />}
+                  </div>
+                  <div className="leg-content">
+                    <div className="leg-text">
+                      <div className="leg-route">{result.legs[2].label}</div>
+                      <div className="leg-meta">{result.legs[2].miles} mi · {legMeta}</div>
+                      {isRodman && <div className="restock-badge">⟳ Restock at CMMC</div>}
+                    </div>
+                    <div className="leg-time">{formatTime(result.legs[2].time)}</div>
+                  </div>
+                </div>
+
+                {isRodman && result.legs[3] && (
+                  <div className="leg">
+                    <div className="leg-connector">
+                      <div className="leg-dot green" />
+                    </div>
+                    <div className="leg-content">
+                      <div className="leg-text">
+                        <div className="leg-route">{result.legs[3].label}</div>
+                        <div className="leg-meta">{result.legs[3].miles} mi · return to base</div>
+                      </div>
+                      <div className="leg-time">{formatTime(result.legs[3].time)}</div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="disclaimer">
