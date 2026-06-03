@@ -1388,7 +1388,7 @@ export default function App() {
               <button
                 className={`fuel-stop-toggle${includeCmmcStop ? " active" : ""}`}
                 onClick={() => setIncludeCmmcStop(v => !v)}
-              >{includeCmmcStop ? `⬤ CMMC Stop +${cfg.cmmcStopMin} min` : "CMMC Stop (excluded)"}</button>
+              >{includeCmmcStop ? `⬤ End Shift at CMMC +${cfg.cmmcStopMin} min` : "End Shift at CMMC?"}</button>
             </div>
           )}
 
