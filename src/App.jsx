@@ -434,6 +434,8 @@ export default function App() {
   const [sendingId, setSendingId] = useState("");
   const [receivingId, setReceivingId] = useState("");
   const [mode, setMode] = useState("ground");
+  const [hasFuelStop, setHasFuelStop] = useState(false);
+  const [fuelStopAirportId, setFuelStopAirportId] = useState("");
 
   // --- all state up front ---
   const [isDark, setIsDark] = useState(isDarkHour);
@@ -479,6 +481,28 @@ export default function App() {
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
     return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + (base.restockId ? CMMC_STOP_MIN : 0) };
   })();
+
+  // Fuel stop (rotor only) — splits the transport leg through an intermediate airport
+  const fuelStop = (() => {
+    if (mode !== "air" || !hasFuelStop || !fuelStopAirportId || !valid) return null;
+    const fsa = AIRPORTS.find(a => a.id === fuelStopAirportId);
+    if (!fsa) return null;
+    const m1 = haversine(sending.lat, sending.lng, fsa.lat, fsa.lng);
+    const m2 = haversine(fsa.lat, fsa.lng, receiving.lat, receiving.lng);
+    return {
+      airport: fsa,
+      leg1: { label: `${sending.city} → ${fsa.code}`, miles: Math.round(m1), time: flightMin(m1) },
+      leg2: { label: `${fsa.code} → ${receiving.city}`, miles: Math.round(m2), time: flightMin(m2) },
+      stopMin: 10,
+    };
+  })();
+
+  const resultWithFuelStop = (() => {
+    if (!result || !fuelStop) return result;
+    const replaced = fuelStop.leg1.time + fuelStop.leg2.time + fuelStop.stopMin - result.legs[1].time;
+    return { ...result, fuelStop, transit: result.transit + replaced, total: result.total + replaced };
+  })();
+  const activeResult = resultWithFuelStop ?? result;
 
   const fwResult = (() => {
     if (mode !== "fw" || !valid || !sendingAirportId || !receivingAirportId) return null;
@@ -531,7 +555,7 @@ export default function App() {
     if (!shiftBaseId) return null;
     const active = getActiveShift(shiftBaseId, now);
     if (!active) return { status: "none" };
-    const activeResult = mode === "fw" ? fwResult : result;
+    const activeResult = mode === "fw" ? fwResult : (resultWithFuelStop ?? result);
     if (!activeResult) return { status: "idle", label: active.label };
     const returnTime = new Date(now.getTime() + activeResult.total * 60 * 1000);
     const gracePeriodEnd = new Date(active.end.getTime() + 2 * 60 * 60 * 1000);
@@ -627,6 +651,11 @@ export default function App() {
       }
     });
   }, [baseId, sendingId, receivingId, mode]);
+
+  // Reset fuel stop when leaving rotor mode
+  useEffect(() => {
+    if (mode !== "air") { setHasFuelStop(false); setFuelStopAirportId(""); }
+  }, [mode]);
 
   // Reset FW mode if base changes away from 600 Hangar
   useEffect(() => {
@@ -788,9 +817,12 @@ export default function App() {
       );
     } else {
       strokeColor = mode === "air" ? "#1e9a58" : "#d4a820";
+      const fsa = fuelStop?.airport;
+      if (fsa) mkr({ lat: fsa.lat, lng: fsa.lng }, "#1e9a58", "#2eb868");
       path = [
         { lat: base.lat, lng: base.lng },
         { lat: sending.lat, lng: sending.lng },
+        ...(fsa ? [{ lat: fsa.lat, lng: fsa.lng }] : []),
         { lat: receiving.lat, lng: receiving.lng },
         ...(base.restockId ? [CMMC_COORDS] : []),
         { lat: base.lat, lng: base.lng },
@@ -805,7 +837,7 @@ export default function App() {
     const bounds = new window.google.maps.LatLngBounds();
     path.forEach(pt => bounds.extend(pt));
     mapInstanceRef.current.fitBounds(bounds, 60);
-  }, [valid, baseId, sendingId, receivingId, mode, groundRoute, sendingAirportId, receivingAirportId, fwGroundLegs]);
+  }, [valid, baseId, sendingId, receivingId, mode, groundRoute, sendingAirportId, receivingAirportId, fwGroundLegs, fuelStop]);
 
   return (
     <>
@@ -851,10 +883,10 @@ export default function App() {
         /* SECTION LABEL */
         .sec-label {
           font-family: 'Share Tech Mono', monospace;
-          font-size: 9px;
-          letter-spacing: 0.28em;
+          font-size: 11px;
+          letter-spacing: 0.22em;
           text-transform: uppercase;
-          color: #8aaac4;
+          color: #4a6a8a;
           margin-bottom: 8px;
         }
 
@@ -929,6 +961,52 @@ export default function App() {
         body[data-theme="dark"] .leg-time.fw            { color: #aac0e8; }
         body[data-theme="dark"] .total-box.highlight.fw { border-color: #3a6ad4; background: #080e1e; }
         body[data-theme="dark"] .total-label.blue       { color: #3a6ad4; }
+
+        /* FUEL STOP */
+        .fuel-stop-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+        .fuel-stop-toggle {
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          background: #f8fafc;
+          border: 1px solid #cddbe8;
+          color: #4a6a8a;
+          border-radius: 2px;
+          padding: 6px 12px;
+          cursor: pointer;
+          transition: all 0.18s;
+          white-space: nowrap;
+        }
+        .fuel-stop-toggle.active { background: #f0fdf4; border-color: #1a7040; color: #1a7040; }
+        .fuel-stop-toggle:not(.active):hover { border-color: #b0c8e0; }
+        .fuel-stop-apt { flex: 1; }
+        .fuel-stop-apt .sel-wrap select { font-size: 15px; padding: 6px 34px 6px 10px; }
+        .fuel-stop-stop {
+          display: flex; align-items: stretch; gap: 0;
+        }
+        .fuel-stop-connector {
+          display: flex; flex-direction: column; align-items: center;
+          width: 28px; flex-shrink: 0; padding: 2px 0;
+        }
+        .fuel-stop-dot {
+          width: 11px; height: 11px; border-radius: 50%;
+          border: 2px solid #1a7040; background: #f0fdf4;
+          flex-shrink: 0; z-index: 1;
+        }
+        .fuel-stop-content { flex: 1; padding: 5px 0 14px 8px; }
+        .fuel-stop-label {
+          font-size: 11px; font-family: 'Share Tech Mono', monospace;
+          letter-spacing: 0.14em; color: #1a7040; text-transform: uppercase;
+        }
+        .fuel-stop-name { font-size: 14px; font-weight: 600; color: #4a6a8a; margin-top: 1px; }
+        .fuel-stop-time { font-size: 18px; font-weight: 700; color: #1a2d40; margin-top: 1px; }
+        body[data-theme="dark"] .fuel-stop-toggle { background: #060f18; border-color: #152434; color: #5a8a9a; }
+        body[data-theme="dark"] .fuel-stop-toggle.active { background: #001810; border-color: #1e7a48; color: #1e9a58; }
+        body[data-theme="dark"] .fuel-stop-dot { border-color: #1e7a48; background: #001810; }
+        body[data-theme="dark"] .fuel-stop-label { color: #1e9a58; }
+        body[data-theme="dark"] .fuel-stop-name { color: #7a9ab0; }
+        body[data-theme="dark"] .fuel-stop-time { color: #deeaf2; }
 
         /* SHIFT INDICATOR */
         .shift-indicator {
@@ -1421,7 +1499,7 @@ export default function App() {
         body[data-theme="dark"] .sub { color: #7aaabb; }
         body[data-theme="dark"] .card { background: #0b1520; border-color: #152434; }
         body[data-theme="dark"] .card::before { background: linear-gradient(to bottom, #d4a820, #1e7a48); }
-        body[data-theme="dark"] .sec-label { color: #2e5a72; }
+        body[data-theme="dark"] .sec-label { color: #7aaabb; }
         body[data-theme="dark"] select { background: #060f18; border-color: #152434; color: #b8ccd8; }
         body[data-theme="dark"] select:focus { border-color: #d4a820; }
         body[data-theme="dark"] select option { background: #0b1520; }
@@ -1475,7 +1553,7 @@ export default function App() {
           <div className="bedside-row">
             <button
               className="reset-pill"
-              onClick={() => { setBaseId(""); setCrewBaseId(""); setSendingId(""); setReceivingId(""); setMode("ground"); setBedsideMin(40); }}
+              onClick={() => { setBaseId(""); setCrewBaseId(""); setSendingId(""); setReceivingId(""); setMode("ground"); setBedsideMin(40); setHasFuelStop(false); setFuelStopAirportId(""); }}
             >Reset</button>
             <div className="bedside-selector">
               <div className="sec-label">Bedside Time</div>
@@ -1592,6 +1670,31 @@ export default function App() {
               title={baseId !== "bangor_hangar" ? "Fixed wing departs from 600 Hangar only" : ""}
             >Fixed Wing</button>
           </div>
+
+          {mode === "air" && (
+            <div className="fuel-stop-row">
+              <button
+                className={`fuel-stop-toggle${hasFuelStop ? " active" : ""}`}
+                onClick={() => { setHasFuelStop(v => !v); setFuelStopAirportId(""); }}
+              >{hasFuelStop ? "⬤ Fuel Stop" : "Add Fuel Stop"}</button>
+              {hasFuelStop && (
+                <div className="fuel-stop-apt">
+                  <div className="sel-wrap">
+                    <select value={fuelStopAirportId} onChange={e => setFuelStopAirportId(e.target.value)}>
+                      <option value="">— Select airport —</option>
+                      {AIRPORT_STATES.map(s => (
+                        <optgroup key={s.code} label={s.name}>
+                          {AIRPORTS.filter(a => a.state === s.code).map(a => (
+                            <option key={a.id} value={a.id}>{a.code} — {a.city}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {shiftInfo && (
             <div>
@@ -1713,7 +1816,7 @@ export default function App() {
                   : ""}
               </div>
             )
-          ) : result ? (
+          ) : activeResult ? (
             <div className="profile" key={`${baseId}-${sendingId}-${receivingId}-${mode}`}>
               <div className="divider">Mission Profile</div>
 
@@ -1748,6 +1851,41 @@ export default function App() {
                   </div>
                 </div>
 
+                {activeResult?.fuelStop ? (<>
+                  <div className="leg">
+                    <div className="leg-connector">
+                      <div className="leg-dot dim" />
+                      <div className="leg-line" />
+                    </div>
+                    <div className="leg-content">
+                      <div className="leg-route">{activeResult.fuelStop.leg1.label}</div>
+                      <div className="leg-meta">{activeResult.fuelStop.leg1.miles} mi · rotor</div>
+                      <div className="leg-time">{formatTime(activeResult.fuelStop.leg1.time)}</div>
+                    </div>
+                  </div>
+                  <div className="fuel-stop-stop">
+                    <div className="fuel-stop-connector">
+                      <div className="fuel-stop-dot" />
+                      <div className="leg-line" />
+                    </div>
+                    <div className="fuel-stop-content">
+                      <div className="fuel-stop-label">Fuel Stop · {activeResult.fuelStop.airport.code}</div>
+                      <div className="fuel-stop-name">{activeResult.fuelStop.airport.city}</div>
+                      <div className="fuel-stop-time">{formatTime(activeResult.fuelStop.stopMin)}</div>
+                    </div>
+                  </div>
+                  <div className="leg">
+                    <div className="leg-connector">
+                      <div className="leg-dot dim" />
+                      <div className="leg-line" />
+                    </div>
+                    <div className="leg-content">
+                      <div className="leg-route">{activeResult.fuelStop.leg2.label}</div>
+                      <div className="leg-meta">{activeResult.fuelStop.leg2.miles} mi · rotor</div>
+                      <div className="leg-time">{formatTime(activeResult.fuelStop.leg2.time)}</div>
+                    </div>
+                  </div>
+                </>) : (
                 <div className="leg">
                   <div className="leg-connector">
                     <div className="leg-dot dim" />
@@ -1759,6 +1897,7 @@ export default function App() {
                     <div className="leg-time">{formatTime(result.legs[1].time)}</div>
                   </div>
                 </div>
+                )}
 
                 <div className="bedside-stop">
                   <div className="bedside-connector">
@@ -1802,13 +1941,13 @@ export default function App() {
               <div className="totals">
                 <div className="total-box">
                   <div className="total-label">Transit Only</div>
-                  <div className="total-value">{formatTime(result.transit)}</div>
+                  <div className="total-value">{formatTime(activeResult.transit)}</div>
                   <div className="total-breakdown">Driving/flight time</div>
                 </div>
                 <div className={`total-box highlight${mode === "air" ? " air" : ""}`}>
                   <div className={`total-label ${mode === "air" ? "green" : "gold"}`}>Total Mission</div>
-                  <div className="total-value">{formatTime(result.total)}</div>
-                  <div className="total-breakdown">Transit + {bedsideTotal} min bedside{isRodman ? " + 15 min CMMC" : ""}</div>
+                  <div className="total-value">{formatTime(activeResult.total)}</div>
+                  <div className="total-breakdown">Transit + {bedsideTotal} min bedside{isRodman ? " + 15 min CMMC" : ""}{activeResult.fuelStop ? " + 10 min fuel" : ""}</div>
                 </div>
               </div>
 
@@ -1825,7 +1964,7 @@ export default function App() {
           )}
         </div>
 
-        {isLoaded && (result || fwResult) && (
+        {isLoaded && (activeResult || fwResult) && (
           <div className="map-wrap">
             <div
               ref={mapDivRefCallback}
