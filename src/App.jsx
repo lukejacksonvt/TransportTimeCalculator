@@ -956,6 +956,7 @@ export default function App() {
         .logo { height: 48px; width: auto; }
         .header-left { flex: 1; }
         .title { font-family: 'Saira', sans-serif; font-size: 24px; font-weight: 600; letter-spacing: -0.005em; color: var(--text); line-height: 1; }
+        .version-label { font-family: 'Spline Sans Mono', monospace; font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-muted); margin-top: 4px; }
         .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
         .clock { font-family: 'Spline Sans Mono', monospace; font-size: 22px; font-weight: 600; color: var(--text); letter-spacing: 0.04em; line-height: 1; }
         .header-actions { display: flex; align-items: center; gap: 6px; }
@@ -1290,6 +1291,7 @@ export default function App() {
             <img src="/lifeflight-logo.svg" className="logo" alt="LifeFlight of Maine" />
             <div className="header-left">
               <div className="title">Mission Time Calculator</div>
+              <div className="version-label">V3</div>
             </div>
             <div className="header-right">
               <div className="clock">{String(now.getHours()).padStart(2,"0")}{String(now.getMinutes()).padStart(2,"0")}</div>
