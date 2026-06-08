@@ -171,6 +171,53 @@ function bearingDeg(lat1, lng1, lat2, lng2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+// Winds-aloft stations covering the NE (3-letter AWC identifiers + coords)
+const WINDS_STATIONS = [
+  { id: "BGR", lat: 44.8074, lng: -68.8281 },
+  { id: "CAR", lat: 46.8715, lng: -68.0179 },
+  { id: "PWM", lat: 43.6462, lng: -70.3087 },
+  { id: "CON", lat: 43.2027, lng: -71.5022 },
+  { id: "BTV", lat: 44.4720, lng: -73.1533 },
+  { id: "ALB", lat: 42.7482, lng: -73.8030 },
+  { id: "BOS", lat: 42.3630, lng: -71.0052 },
+];
+
+// Parse a single 3000 ft winds-aloft group, e.g. "2318", "2318+14", "9900"
+function parseWindGroup(group) {
+  if (!group) return null;
+  const digits = group.replace(/[+-]\d+$/, ""); // strip temperature
+  if (digits.length < 4) return null;
+  if (digits === "9900") return { dir: 0, spd: 0 }; // calm / light & variable
+  let dirCode = parseInt(digits.slice(0, 2), 10);
+  let spd     = parseInt(digits.slice(2, 4), 10);
+  if (isNaN(dirCode) || isNaN(spd)) return null;
+  // High-speed encoding (>99 kts): dirCode > 36 → subtract 50, add 100 to spd
+  if (dirCode > 36) { dirCode -= 50; spd += 100; }
+  return { dir: dirCode * 10, spd };
+}
+
+async function fetchWindsAloft(midLat, midLng) {
+  // Pick nearest AWC station to route midpoint
+  const station = WINDS_STATIONS.reduce((best, s) => {
+    const d = haversine(midLat, midLng, s.lat, s.lng);
+    return d < best.d ? { ...s, d } : best;
+  }, { ...WINDS_STATIONS[0], d: Infinity });
+
+  const res = await fetch("https://aviationweather.gov/api/data/windtemp").catch(() => null);
+  if (!res?.ok) return null;
+  const text = await res.text();
+
+  // Find the station's line in the text product
+  const line = text.split("\n").find(l => /^[A-Z]{3}\s/.test(l.trim()) && l.trim().startsWith(station.id + " "));
+  if (!line) return null;
+
+  const cols = line.trim().split(/\s+/);
+  // cols[0]=stationId, cols[1]=3000ft, cols[2]=6000ft …
+  const wind = parseWindGroup(cols[1]);
+  if (!wind) return null;
+  return { ...wind, station: station.id };
+}
+
 // Positive = headwind (slows), negative = tailwind (speeds up).
 // windDirDeg is meteorological: the direction FROM which wind blows.
 function windCorrectedSpeed(airspeedKts, legBearingDeg, windSpeedKts, windDirDeg) {
@@ -478,6 +525,10 @@ export default function App() {
   const [bedsideMin, setBedsideMin] = useState(40);
   const [windSpeedKts, setWindSpeedKts] = useState(0);
   const [windDirDeg, setWindDirDeg] = useState(0);
+  const [windAuto, setWindAuto] = useState(true);
+  const [windStation, setWindStation] = useState(null);
+  const [windFetchedAt, setWindFetchedAt] = useState(null);
+  const [windFetching, setWindFetching] = useState(false);
   const [weatherLayer, setWeatherLayer] = useState("precip");
   const [showTraffic, setShowTraffic] = useState(true);
   const [hospitalWeather, setHospitalWeather] = useState({});
@@ -697,6 +748,23 @@ export default function App() {
   useEffect(() => {
     if (mode !== "air") { setHasFuelStop(false); setFuelStopAirportId(""); }
   }, [mode]);
+
+  // Auto-fetch winds aloft when in air/fw mode
+  useEffect(() => {
+    if (mode !== "air" && mode !== "fw") return;
+    if (!windAuto) return;
+    const midLat = base && sending ? (base.lat + sending.lat) / 2 : 44.5;
+    const midLng = base && sending ? (base.lng + sending.lng) / 2 : -69.0;
+    setWindFetching(true);
+    fetchWindsAloft(midLat, midLng).then(result => {
+      setWindFetching(false);
+      if (!result) return;
+      setWindSpeedKts(result.spd);
+      setWindDirDeg(result.dir);
+      setWindStation(result.station);
+      setWindFetchedAt(new Date());
+    });
+  }, [mode, baseId, sendingId, windAuto]);
 
   // Reset FW mode if base changes away from 600 Hangar
   useEffect(() => {
@@ -1278,6 +1346,19 @@ export default function App() {
         .wind-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .wind-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,122,68,.1); }
         .wind-active .wind-input { border-color: var(--green); }
+        .wind-refresh {
+          align-self: flex-end; flex-shrink: 0;
+          background: var(--surface-2); border: 1px solid var(--border-strong);
+          color: var(--text-muted); border-radius: var(--r-sm);
+          width: 34px; height: 34px; font-size: 16px; cursor: pointer;
+          transition: all 0.18s; display: flex; align-items: center; justify-content: center;
+        }
+        .wind-refresh:hover { border-color: var(--green); color: var(--green); }
+        .wind-refresh.auto { border-color: var(--green); color: var(--green); background: var(--green-tint); }
+        .wind-meta {
+          font-family: 'Spline Sans Mono', monospace; font-size: 9px;
+          letter-spacing: .12em; color: var(--text-muted); margin-top: 4px;
+        }
 
         /* TRANSITIONS */
         .app-root, .card, select, .mode-btn, .total-box, .leg-dot, .bedside-dot {
@@ -1436,7 +1517,7 @@ export default function App() {
                   type="number" className="wind-input" min="0" max="150"
                   value={windSpeedKts || ""}
                   placeholder="0"
-                  onChange={e => setWindSpeedKts(Math.max(0, Number(e.target.value) || 0))}
+                  onChange={e => { setWindAuto(false); setWindSpeedKts(Math.max(0, Number(e.target.value) || 0)); }}
                 />
               </div>
               <div className="wind-field">
@@ -1445,9 +1526,26 @@ export default function App() {
                   type="number" className="wind-input" min="0" max="360"
                   value={windDirDeg || ""}
                   placeholder="0"
-                  onChange={e => setWindDirDeg(((Number(e.target.value) || 0) % 360 + 360) % 360)}
+                  onChange={e => { setWindAuto(false); setWindDirDeg(((Number(e.target.value) || 0) % 360 + 360) % 360); }}
                 />
               </div>
+              <button
+                className={`wind-refresh${windAuto ? " auto" : ""}`}
+                title={windAuto ? "Auto-fetching from AWC" : "Click to re-fetch from AWC"}
+                onClick={() => { setWindAuto(true); }}
+              >{windFetching ? "…" : "↻"}</button>
+            </div>
+          )}
+          {(mode === "air" || mode === "fw") && (
+            <div className="wind-meta">
+              {windFetching
+                ? "Fetching winds aloft…"
+                : windFetchedAt && windAuto
+                  ? `AWC 3,000 ft · ${windStation} · ${String(windFetchedAt.getHours()).padStart(2,"0")}:${String(windFetchedAt.getMinutes()).padStart(2,"0")}`
+                  : !windAuto
+                    ? "Manual · click ↻ to re-fetch"
+                    : "Fetching…"
+              }
             </div>
           )}
 
