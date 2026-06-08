@@ -1372,7 +1372,7 @@ export default function App() {
             <img src="/lifeflight-logo.svg" className="logo" alt="LifeFlight of Maine" />
             <div className="header-left">
               <div className="title">Mission Time Calculator</div>
-              <div className="version-label">V3.1</div>
+              <div className="version-label">V3.2</div>
             </div>
             <div className="header-right">
               <div className="clock">{String(now.getHours()).padStart(2,"0")}{String(now.getMinutes()).padStart(2,"0")}</div>
