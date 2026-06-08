@@ -5,14 +5,14 @@ export const DEFAULT_CONFIG = {
   groundOpsMin: 5,
   // Rotor
   rotorSpeedKts: 145,
-  rotorOpsMin: 10,
+  rotorOpsMin: 12,
   // Fixed Wing
   fwSpeedKts: 270,
   fwLiftMin: 30,
   fwOpsMin: 10,
   // Stop times
   cmmcStopMin: 15,
-  fuelStopMin: 10,
+  fuelStopMin: 12,
   // Bedside presets
   bedsidePresets: [
     { label: "20 min", min: 20 },

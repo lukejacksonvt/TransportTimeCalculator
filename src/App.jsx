@@ -163,12 +163,23 @@ function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function groundMin(miles, cfg) {
-  return Math.round((miles * cfg.groundWindingFactor / cfg.groundSpeedMph) * 60 + cfg.groundOpsMin);
+function bearingDeg(lat1, lng1, lat2, lng2) {
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δλ = (lng2 - lng1) * Math.PI / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-function flightMin(miles, cfg) {
-  return Math.round((miles / cfg.rotorSpeedKts) * 60 + cfg.rotorOpsMin);
+// Positive = headwind (slows), negative = tailwind (speeds up).
+// windDirDeg is meteorological: the direction FROM which wind blows.
+function windCorrectedSpeed(airspeedKts, legBearingDeg, windSpeedKts, windDirDeg) {
+  const hw = windSpeedKts * Math.cos((windDirDeg - legBearingDeg) * Math.PI / 180);
+  return Math.max(airspeedKts - hw, 10);
+}
+
+function groundMin(miles, cfg) {
+  return Math.round((miles * cfg.groundWindingFactor / cfg.groundSpeedMph) * 60 + cfg.groundOpsMin);
 }
 
 function formatTime(mins) {
@@ -182,9 +193,6 @@ function formatTime(mins) {
 const parseSecs = s => parseInt(s) || 0;
 
 // Fixed Wing — King Air B200 with Raisbeck EPIC Platinum (defaults; overridden by config)
-const FW_SPEED_KTS = 270;
-const FW_LIFT_MIN  = 30;
-const FW_OPS_MIN   = 10;
 
 const AIRPORTS = [
   // Maine
@@ -215,10 +223,6 @@ const AIRPORT_STATES = [
   { code: "VT", name: "Vermont" },
 ];
 
-function fwFlightMin(lat1, lng1, lat2, lng2, cfg) {
-  const nm = haversine(lat1, lng1, lat2, lng2) * 0.868976;
-  return Math.round((nm / cfg.fwSpeedKts) * 60 + cfg.fwOpsMin);
-}
 
 const BASE_SHIFTS = {
   sanford:       [{ start: 800,  end: 2000 }, { start: 2000, end: 800  }],
@@ -312,40 +316,51 @@ async function computeRoute(origin, waypoints, destination) {
 }
 
 
-function calcLegs(base, sending, receiving, mode, cfg) {
-  const timeFn = mode === "air" ? (m) => flightMin(m, cfg) : (m) => groundMin(m, cfg);
+function calcLegs(base, sending, receiving, mode, cfg, windSpeedKts = 0, windDirDeg = 0) {
+  const CMMC = { lat: CMMC_COORDS.lat, lng: CMMC_COORDS.lng };
+  const dist  = (a, b) => haversine(a.lat, a.lng, b.lat, b.lng);
 
-  const dist = (a, b) => haversine(a.lat, a.lng, b.lat, b.lng);
+  const airLeg = (from, to, liftMin = 0) => {
+    const miles   = dist(from, to);
+    const bearing = bearingDeg(from.lat, from.lng, to.lat, to.lng);
+    const gs      = windSpeedKts > 0
+      ? windCorrectedSpeed(cfg.rotorSpeedKts, bearing, windSpeedKts, windDirDeg)
+      : cfg.rotorSpeedKts;
+    return { miles, time: Math.round((miles / gs) * 60 + liftMin), gs: Math.round(gs) };
+  };
+  const groundLeg = (from, to) => {
+    const miles = dist(from, to);
+    return { miles, time: groundMin(miles, cfg), gs: null };
+  };
 
-  const leg1 = dist(base, sending);   // base -> sending
-  const leg2 = dist(sending, receiving); // sending -> receiving
-  const leg3 = base.restockId
-    ? dist(receiving, CMMC_COORDS)     // receiving -> CMMC (restock)
-    : dist(receiving, base);           // receiving -> base
+  // Lift overhead only on the initial departure leg; subsequent legs covered by bedside time.
+  let l1, l2, l3, l4;
+  if (mode === "air") {
+    l1 = airLeg(base, sending, cfg.rotorOpsMin);
+    l2 = airLeg(sending, receiving);
+    l3 = base.restockId ? airLeg(receiving, CMMC) : airLeg(receiving, base);
+    l4 = base.restockId ? airLeg(CMMC, base) : null;
+  } else {
+    l1 = groundLeg(base, sending);
+    l2 = groundLeg(sending, receiving);
+    l3 = base.restockId ? groundLeg(receiving, CMMC) : groundLeg(receiving, base);
+    l4 = base.restockId ? groundLeg(CMMC, base) : null;
+  }
 
-  const leg4 = base.restockId
-    ? dist(CMMC_COORDS, base)          // CMMC -> Rodman Road
-    : null;
-
-  const t1 = timeFn(leg1);
-  const t2 = timeFn(leg2);
-  const t3 = timeFn(leg3);
-  const t4 = leg4 ? timeFn(leg4) : null;
-
-  const transit = t1 + t2 + t3 + (t4 || 0);
-  const total = transit + BEDSIDE_TOTAL + (base.restockId ? CMMC_STOP_MIN : 0);
+  const transit = l1.time + l2.time + l3.time + (l4?.time || 0);
+  const total   = transit + BEDSIDE_TOTAL + (base.restockId ? CMMC_STOP_MIN : 0);
 
   return {
     legs: [
-      { label: `${base.city} → ${sending.city}`, miles: Math.round(leg1), time: t1 },
-      { label: `${sending.city} → ${receiving.city}`, miles: Math.round(leg2), time: t2 },
+      { label: `${base.city} → ${sending.city}`,     miles: Math.round(l1.miles), time: l1.time, gs: l1.gs },
+      { label: `${sending.city} → ${receiving.city}`,miles: Math.round(l2.miles), time: l2.time, gs: l2.gs },
       ...(base.restockId
         ? [
-            { label: `${receiving.city} → CMMC (restock)`, miles: Math.round(leg3), time: t3 },
-            { label: `CMMC → ${base.city}`, miles: Math.round(dist(CMMC_COORDS, base)), time: t4 },
+            { label: `${receiving.city} → CMMC (restock)`, miles: Math.round(l3.miles), time: l3.time, gs: l3.gs },
+            { label: `CMMC → ${base.city}`,                miles: Math.round(dist(CMMC, base)), time: l4.time, gs: l4.gs },
           ]
         : [
-            { label: `${receiving.city} → ${base.city}`, miles: Math.round(leg3), time: t3 },
+            { label: `${receiving.city} → ${base.city}`, miles: Math.round(l3.miles), time: l3.time, gs: l3.gs },
           ]),
     ],
     transit,
@@ -461,6 +476,8 @@ export default function App() {
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
   const [bedsideMin, setBedsideMin] = useState(40);
+  const [windSpeedKts, setWindSpeedKts] = useState(0);
+  const [windDirDeg, setWindDirDeg] = useState(0);
   const [weatherLayer, setWeatherLayer] = useState("precip");
   const [showTraffic, setShowTraffic] = useState(true);
   const [hospitalWeather, setHospitalWeather] = useState({});
@@ -482,7 +499,7 @@ export default function App() {
   const cmmcAdd = isRodman && includeCmmcStop ? cfg.cmmcStopMin : 0;
 
   const bedsideTotal = bedsideMin * 2;
-  const haverResult = (valid && mode !== "fw") ? calcLegs(base, sending, receiving, mode, cfg) : null;
+  const haverResult = (valid && mode !== "fw") ? calcLegs(base, sending, receiving, mode, cfg, windSpeedKts, windDirDeg) : null;
   const result = (() => {
     if (!haverResult) return null;
     if (mode !== "ground" || !groundRoute) {
@@ -505,10 +522,14 @@ export default function App() {
     if (!fsa) return null;
     const m1 = haversine(sending.lat, sending.lng, fsa.lat, fsa.lng);
     const m2 = haversine(fsa.lat, fsa.lng, receiving.lat, receiving.lng);
+    const b1 = bearingDeg(sending.lat, sending.lng, fsa.lat, fsa.lng);
+    const b2 = bearingDeg(fsa.lat, fsa.lng, receiving.lat, receiving.lng);
+    const gs1 = windSpeedKts > 0 ? windCorrectedSpeed(cfg.rotorSpeedKts, b1, windSpeedKts, windDirDeg) : cfg.rotorSpeedKts;
+    const gs2 = windSpeedKts > 0 ? windCorrectedSpeed(cfg.rotorSpeedKts, b2, windSpeedKts, windDirDeg) : cfg.rotorSpeedKts;
     return {
       airport: fsa,
-      leg1: { label: `${sending.city} → ${fsa.code}`, miles: Math.round(m1), time: flightMin(m1, cfg) },
-      leg2: { label: `${fsa.code} → ${receiving.city}`, miles: Math.round(m2), time: flightMin(m2, cfg) },
+      leg1: { label: `${sending.city} → ${fsa.code}`, miles: Math.round(m1), time: Math.round((m1 / gs1) * 60), gs: Math.round(gs1) },
+      leg2: { label: `${fsa.code} → ${receiving.city}`, miles: Math.round(m2), time: Math.round((m2 / gs2) * 60), gs: Math.round(gs2) },
       stopMin: cfg.fuelStopMin,
     };
   })();
@@ -538,13 +559,21 @@ export default function App() {
       miles: gl?.[key]?.miles ?? Math.round(haversine(fLat, fLng, tLat, tLng)),
       live: !!gl?.[key]?.time,
     });
-    const fLeg = (a, b) => ({
-      type: "flight",
-      toCoord: { lat: b.lat, lng: b.lng },
-      label: `Flight · ${a.code} → ${b.code}`,
-      time:  fwFlightMin(a.lat, a.lng, b.lat, b.lng, cfg),
-      miles: Math.round(haversine(a.lat, a.lng, b.lat, b.lng) * 0.868976),
-    });
+    const fLeg = (a, b) => {
+      const nm      = haversine(a.lat, a.lng, b.lat, b.lng) * 0.868976;
+      const bearing = bearingDeg(a.lat, a.lng, b.lat, b.lng);
+      const gs      = windSpeedKts > 0
+        ? windCorrectedSpeed(cfg.fwSpeedKts, bearing, windSpeedKts, windDirDeg)
+        : cfg.fwSpeedKts;
+      return {
+        type: "flight",
+        toCoord: { lat: b.lat, lng: b.lng },
+        label: `Flight · ${a.code} → ${b.code}`,
+        time:  Math.round((nm / gs) * 60 + cfg.fwOpsMin),
+        miles: Math.round(nm),
+        gs:    Math.round(gs),
+      };
+    };
 
     const legs = [];
     legs.push({ type: "lift", label: "Lift · 600 Hangar (KBGR)", time: cfg.fwLiftMin });
@@ -1235,6 +1264,20 @@ export default function App() {
         .admin-link { font-family: 'Spline Sans Mono', monospace; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); text-decoration: none; }
         .admin-link:hover { color: var(--text-2); }
 
+        /* WIND INPUT */
+        .wind-row { display: flex; gap: 10px; margin-top: 10px; }
+        .wind-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .wind-input {
+          width: 100%; background: var(--inset); border: 1px solid var(--border-strong);
+          color: var(--text); font-family: 'Spline Sans Mono', monospace; font-size: 15px;
+          padding: 7px 10px; border-radius: var(--r-sm); outline: none;
+          transition: border-color 0.18s; -moz-appearance: textfield;
+        }
+        .wind-input::-webkit-inner-spin-button,
+        .wind-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .wind-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,122,68,.1); }
+        .wind-active .wind-input { border-color: var(--green); }
+
         /* TRANSITIONS */
         .app-root, .card, select, .mode-btn, .total-box, .leg-dot, .bedside-dot {
           transition: background 0.4s, color 0.4s, border-color 0.4s;
@@ -1383,6 +1426,29 @@ export default function App() {
             >Fixed Wing</button>
           </div>
 
+          {(mode === "air" || mode === "fw") && (
+            <div className={`wind-row${windSpeedKts > 0 ? " wind-active" : ""}`}>
+              <div className="wind-field">
+                <div className="sec-label">Wind Speed (kts)</div>
+                <input
+                  type="number" className="wind-input" min="0" max="150"
+                  value={windSpeedKts || ""}
+                  placeholder="0"
+                  onChange={e => setWindSpeedKts(Math.max(0, Number(e.target.value) || 0))}
+                />
+              </div>
+              <div className="wind-field">
+                <div className="sec-label">Wind From (°)</div>
+                <input
+                  type="number" className="wind-input" min="0" max="360"
+                  value={windDirDeg || ""}
+                  placeholder="0"
+                  onChange={e => setWindDirDeg(((Number(e.target.value) || 0) % 360 + 360) % 360)}
+                />
+              </div>
+            </div>
+          )}
+
           {isRodman && mode !== "fw" && (
             <div className="fuel-stop-row">
               <button
@@ -1509,7 +1575,7 @@ export default function App() {
                           <div className="leg-content">
                             <div className="leg-text">
                               <div className="leg-route">{leg.label}</div>
-                              <div className="leg-meta fw">{leg.miles} nm · {FW_SPEED_KTS} kts</div>
+                              <div className="leg-meta fw">{leg.miles} nm · {leg.gs ?? cfg.fwSpeedKts} kts GS</div>
                             </div>
                             <div className="leg-time fw">{formatTime(leg.time)}</div>
                           </div>
@@ -1578,7 +1644,7 @@ export default function App() {
                   <div className="leg-content">
                     <div className="leg-text">
                       <div className="leg-route">{result.legs[0].label}</div>
-                      <div className="leg-meta">{result.legs[0].miles} mi · {legMeta}</div>
+                      <div className="leg-meta">{result.legs[0].miles} mi · {result.legs[0].gs ? `${result.legs[0].gs} kts GS · +${cfg.rotorOpsMin}m lift` : legMeta}</div>
                     </div>
                     <div className="leg-time">{formatTime(result.legs[0].time)}</div>
                   </div>
@@ -1607,7 +1673,7 @@ export default function App() {
                     <div className="leg-content">
                       <div className="leg-text">
                         <div className="leg-route">{activeResult.fuelStop.leg1.label}</div>
-                        <div className="leg-meta">{activeResult.fuelStop.leg1.miles} mi · rotor</div>
+                        <div className="leg-meta">{activeResult.fuelStop.leg1.miles} mi · {activeResult.fuelStop.leg1.gs ? `${activeResult.fuelStop.leg1.gs} kts GS` : "rotor"}</div>
                       </div>
                       <div className="leg-time">{formatTime(activeResult.fuelStop.leg1.time)}</div>
                     </div>
@@ -1633,7 +1699,7 @@ export default function App() {
                     <div className="leg-content">
                       <div className="leg-text">
                         <div className="leg-route">{activeResult.fuelStop.leg2.label}</div>
-                        <div className="leg-meta">{activeResult.fuelStop.leg2.miles} mi · rotor</div>
+                        <div className="leg-meta">{activeResult.fuelStop.leg2.miles} mi · {activeResult.fuelStop.leg2.gs ? `${activeResult.fuelStop.leg2.gs} kts GS` : "rotor"}</div>
                       </div>
                       <div className="leg-time">{formatTime(activeResult.fuelStop.leg2.time)}</div>
                     </div>
@@ -1647,7 +1713,7 @@ export default function App() {
                   <div className="leg-content">
                     <div className="leg-text">
                       <div className="leg-route">{result.legs[1].label}</div>
-                      <div className="leg-meta">{result.legs[1].miles} mi · {legMeta}</div>
+                      <div className="leg-meta">{result.legs[1].miles} mi · {result.legs[1].gs ? `${result.legs[1].gs} kts GS` : legMeta}</div>
                     </div>
                     <div className="leg-time">{formatTime(result.legs[1].time)}</div>
                   </div>
@@ -1676,7 +1742,7 @@ export default function App() {
                   <div className="leg-content">
                     <div className="leg-text">
                       <div className="leg-route">{result.legs[2].label}</div>
-                      <div className="leg-meta">{result.legs[2].miles} mi · {legMeta}</div>
+                      <div className="leg-meta">{result.legs[2].miles} mi · {result.legs[2].gs ? `${result.legs[2].gs} kts GS` : legMeta}</div>
                       {isRodman && <div className="restock-badge">⟳ Restock at CMMC</div>}
                     </div>
                     <div className="leg-time">{formatTime(result.legs[2].time)}</div>
@@ -1691,7 +1757,7 @@ export default function App() {
                     <div className="leg-content">
                       <div className="leg-text">
                         <div className="leg-route">{result.legs[3].label}</div>
-                        <div className="leg-meta">{result.legs[3].miles} mi · return to base</div>
+                        <div className="leg-meta">{result.legs[3].miles} mi · {result.legs[3].gs ? `${result.legs[3].gs} kts GS` : "return to base"}</div>
                       </div>
                       <div className="leg-time">{formatTime(result.legs[3].time)}</div>
                     </div>
