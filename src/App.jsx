@@ -203,7 +203,7 @@ async function fetchWindsAloft(midLat, midLng) {
     return d < best.d ? { ...s, d } : best;
   }, { ...WINDS_STATIONS[0], d: Infinity });
 
-  const res = await fetch("https://aviationweather.gov/api/data/windtemp").catch(() => null);
+  const res = await fetch("/api/windtemp").catch(() => null);
   if (!res?.ok) return null;
   const text = await res.text();
 

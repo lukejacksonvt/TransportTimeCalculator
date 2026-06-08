@@ -3,6 +3,15 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      "/api/windtemp": {
+        target: "https://aviationweather.gov/api/data/windtemp",
+        changeOrigin: true,
+        rewrite: () => "",
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {
