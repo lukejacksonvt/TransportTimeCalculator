@@ -35,6 +35,7 @@ const HOSPITALS = [
   { id: "scdh",   state: "ME", name: "Sebasticook Valley Health",           city: "Pittsfield",    lat: 44.7787, lng: -69.3817 },
   { id: "stmary", state: "ME", name: "St. Mary's Regional Medical Center",  city: "Lewiston",      lat: 44.1015, lng: -70.2130 },
   { id: "smh",    state: "ME", name: "Stephens Memorial Hospital",          city: "Norway",        lat: 44.2090, lng: -70.5370 },
+  { id: "togus",  state: "ME", name: "Togus VA Medical Center",             city: "Augusta",       lat: 44.2747, lng: -69.7376 },
   { id: "wcgh",   state: "ME", name: "Waldo County General Hospital",       city: "Belfast",       lat: 44.4273, lng: -69.0069 },
   { id: "ych",    state: "ME", name: "York Hospital",                       city: "York",          lat: 43.1690, lng: -70.6470 },
   // New Hampshire
@@ -256,6 +257,8 @@ const AIRPORTS = [
   { id: "pnn", state: "ME", code: "KPNN", city: "Princeton",    lat: 45.2065, lng: -67.5654 },
   { id: "lew", state: "ME", code: "KLEW", city: "Auburn",       lat: 44.0484, lng: -70.2835 },
   { id: "sfm", state: "ME", code: "KSFM", city: "Sanford",      lat: 43.3939, lng: -70.7080 },
+  // New Hampshire
+  { id: "psm", state: "NH", code: "KPSM", city: "Portsmouth",   lat: 43.0779, lng: -70.8233 },
   // Massachusetts
   { id: "bos", state: "MA", code: "KBOS", city: "Boston",       lat: 42.3630, lng: -71.0052 },
   { id: "orh", state: "MA", code: "KORH", city: "Worcester",    lat: 42.2673, lng: -71.8757 },
@@ -266,6 +269,7 @@ const AIRPORTS = [
 ];
 const AIRPORT_STATES = [
   { code: "ME", name: "Maine" },
+  { code: "NH", name: "New Hampshire" },
   { code: "MA", name: "Massachusetts" },
   { code: "VT", name: "Vermont" },
 ];
@@ -1372,7 +1376,7 @@ export default function App() {
             <img src="/lifeflight-logo.svg" className="logo" alt="LifeFlight of Maine" />
             <div className="header-left">
               <div className="title">Mission Time Calculator</div>
-              <div className="version-label">V3.2</div>
+              <div className="version-label">V3.3</div>
             </div>
             <div className="header-right">
               <div className="clock">{String(now.getHours()).padStart(2,"0")}{String(now.getMinutes()).padStart(2,"0")}</div>
