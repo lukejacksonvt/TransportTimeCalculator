@@ -177,7 +177,6 @@ export default function AdminPage() {
         <div className="ad-section">
           <div className="ad-section-title">Timing Constants</div>
           <div className="ad-grid">
-            <NumField label="CMMC Restock Stop" value={cfg.cmmcStopMin} unit="min" min={0} max={60} onChange={v => set("cmmcStopMin", v)} />
             <NumField label="Fuel Stop Duration" value={cfg.fuelStopMin} unit="min" min={0} max={60} onChange={v => set("fuelStopMin", v)} />
           </div>
           <div className="ad-divider" />

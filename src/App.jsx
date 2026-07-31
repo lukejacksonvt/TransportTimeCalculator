@@ -143,7 +143,6 @@ function isDarkHour() {
   const h = new Date().getHours();
   return h >= 20 || h < 6;
 }
-const CMMC_STOP_MIN = 15; // blood/narcotics dropoff at CMMC (Rodman only)
 const BEDSIDE_TOTAL = 80;  // placeholder for calcLegs; overridden by bedsideMin state in component
 
 const BEDSIDE_PRESETS = [
@@ -367,8 +366,9 @@ async function computeRoute(origin, waypoints, destination) {
 }
 
 
-function calcLegs(base, sending, receiving, mode, cfg, windSpeedKts = 0, windDirDeg = 0) {
+function calcLegs(base, sending, receiving, mode, cfg, windSpeedKts = 0, windDirDeg = 0, includeRestock = true) {
   const CMMC = { lat: CMMC_COORDS.lat, lng: CMMC_COORDS.lng };
+  const restock = !!base.restockId && includeRestock;
   const dist  = (a, b) => haversine(a.lat, a.lng, b.lat, b.lng);
 
   const airLeg = (from, to, liftMin = 0) => {
@@ -389,23 +389,23 @@ function calcLegs(base, sending, receiving, mode, cfg, windSpeedKts = 0, windDir
   if (mode === "air") {
     l1 = airLeg(base, sending, cfg.rotorOpsMin);
     l2 = airLeg(sending, receiving);
-    l3 = base.restockId ? airLeg(receiving, CMMC) : airLeg(receiving, base);
-    l4 = base.restockId ? airLeg(CMMC, base) : null;
+    l3 = restock ? airLeg(receiving, CMMC) : airLeg(receiving, base);
+    l4 = restock ? airLeg(CMMC, base) : null;
   } else {
     l1 = groundLeg(base, sending);
     l2 = groundLeg(sending, receiving);
-    l3 = base.restockId ? groundLeg(receiving, CMMC) : groundLeg(receiving, base);
-    l4 = base.restockId ? groundLeg(CMMC, base) : null;
+    l3 = restock ? groundLeg(receiving, CMMC) : groundLeg(receiving, base);
+    l4 = restock ? groundLeg(CMMC, base) : null;
   }
 
   const transit = l1.time + l2.time + l3.time + (l4?.time || 0);
-  const total   = transit + BEDSIDE_TOTAL + (base.restockId ? CMMC_STOP_MIN : 0);
+  const total   = transit + BEDSIDE_TOTAL;
 
   return {
     legs: [
       { label: `${base.city} → ${sending.city}`,     miles: Math.round(l1.miles), time: l1.time, gs: l1.gs },
       { label: `${sending.city} → ${receiving.city}`,miles: Math.round(l2.miles), time: l2.time, gs: l2.gs },
-      ...(base.restockId
+      ...(restock
         ? [
             { label: `${receiving.city} → CMMC (restock)`, miles: Math.round(l3.miles), time: l3.time, gs: l3.gs },
             { label: `CMMC → ${base.city}`,                miles: Math.round(dist(CMMC, base)), time: l4.time, gs: l4.gs },
@@ -550,15 +550,15 @@ export default function App() {
   // --- derived values ---
   const valid = base && sending && receiving && sendingId !== receivingId;
   const isRodman = base?.restockId != null;
+  const restockActive = isRodman && includeCmmcStop;
   const legMeta = groundRoute ? "road routing" : "transit";
-  const cmmcAdd = isRodman && includeCmmcStop ? cfg.cmmcStopMin : 0;
 
   const bedsideTotal = bedsideMin * 2;
-  const haverResult = (valid && mode !== "fw") ? calcLegs(base, sending, receiving, mode, cfg, windSpeedKts, windDirDeg) : null;
+  const haverResult = (valid && mode !== "fw") ? calcLegs(base, sending, receiving, mode, cfg, windSpeedKts, windDirDeg, includeCmmcStop) : null;
   const result = (() => {
     if (!haverResult) return null;
     if (mode !== "ground" || !groundRoute) {
-      return { ...haverResult, total: haverResult.transit + bedsideTotal + cmmcAdd };
+      return { ...haverResult, total: haverResult.transit + bedsideTotal };
     }
     const apiLegs = groundRoute.legs;
     const updatedLegs = haverResult.legs.map((leg, i) => ({
@@ -567,7 +567,7 @@ export default function App() {
       miles: apiLegs[i] ? Math.round((apiLegs[i].distanceMeters ?? 0) / 1609.34) : leg.miles,
     }));
     const transit = updatedLegs.reduce((sum, l) => sum + l.time, 0);
-    return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal + cmmcAdd };
+    return { ...haverResult, legs: updatedLegs, transit, total: transit + bedsideTotal };
   })();
 
   // Fuel stop (rotor only) — splits the transport leg through an intermediate airport
@@ -726,11 +726,11 @@ export default function App() {
   useEffect(() => {
     if (!valid || mode !== "ground") { setGroundRoute(null); return; }
     // When receiving IS the restock hospital, skip the duplicate intermediate
-    const receivingIsRestock = base.restockId && receiving.id === base.restockId;
+    const receivingIsRestock = restockActive && receiving.id === base.restockId;
     const waypoints = [
       { lat: sending.lat, lng: sending.lng },
       { lat: receiving.lat, lng: receiving.lng },
-      ...(base.restockId && !receivingIsRestock ? [{ lat: CMMC_COORDS.lat, lng: CMMC_COORDS.lng }] : []),
+      ...(restockActive && !receivingIsRestock ? [{ lat: CMMC_COORDS.lat, lng: CMMC_COORDS.lng }] : []),
     ];
     computeRoute(
       { lat: base.lat, lng: base.lng },
@@ -746,7 +746,7 @@ export default function App() {
         setGroundRoute(route);
       }
     });
-  }, [baseId, sendingId, receivingId, mode]);
+  }, [baseId, sendingId, receivingId, mode, includeCmmcStop]);
 
   // Reset fuel stop when leaving rotor mode
   useEffect(() => {
@@ -937,7 +937,7 @@ export default function App() {
         { lat: sending.lat, lng: sending.lng },
         ...(fsa ? [{ lat: fsa.lat, lng: fsa.lng }] : []),
         { lat: receiving.lat, lng: receiving.lng },
-        ...(base.restockId ? [CMMC_COORDS] : []),
+        ...(restockActive ? [CMMC_COORDS] : []),
         { lat: base.lat, lng: base.lng },
       ];
     }
@@ -950,7 +950,7 @@ export default function App() {
     const bounds = new window.google.maps.LatLngBounds();
     path.forEach(pt => bounds.extend(pt));
     mapInstanceRef.current.fitBounds(bounds, 60);
-  }, [valid, baseId, sendingId, receivingId, mode, groundRoute, sendingAirportId, receivingAirportId, fwGroundLegs, fuelStop]);
+  }, [valid, baseId, sendingId, receivingId, mode, groundRoute, sendingAirportId, receivingAirportId, fwGroundLegs, fuelStop, includeCmmcStop]);
 
   const toggleTheme = () => setIsDark(v => { const n = !v; localStorage.setItem("theme", n ? "dark" : "light"); return n; });
 
@@ -1376,7 +1376,7 @@ export default function App() {
             <img src="/lifeflight-logo.svg" className="logo" alt="LifeFlight of Maine" />
             <div className="header-left">
               <div className="title">Mission Time Calculator</div>
-              <div className="version-label">V3.3</div>
+              <div className="version-label">V3.4</div>
             </div>
             <div className="header-right">
               <div className="clock">{String(now.getHours()).padStart(2,"0")}{String(now.getMinutes()).padStart(2,"0")}</div>
@@ -1558,7 +1558,7 @@ export default function App() {
               <button
                 className={`fuel-stop-toggle${includeCmmcStop ? " active" : ""}`}
                 onClick={() => setIncludeCmmcStop(v => !v)}
-              >{includeCmmcStop ? `⬤ End Shift at CMMC +${cfg.cmmcStopMin} min` : "End Shift at CMMC?"}</button>
+              >{includeCmmcStop ? "⬤ Restock at CMMC" : "Skip CMMC restock"}</button>
             </div>
           )}
 
@@ -1735,7 +1735,7 @@ export default function App() {
                 <div className={`total-box highlight${mode === "air" ? " air" : ""}`}>
                   <div className={`total-label ${mode === "air" ? "green" : "gold"}`}>Total Mission</div>
                   <div className="total-value">{formatTime(activeResult.total)}</div>
-                  <div className="total-breakdown">Transit + {bedsideTotal} min bedside{isRodman && includeCmmcStop ? ` + ${cfg.cmmcStopMin} min CMMC` : ""}{activeResult.fuelStop ? ` + ${cfg.fuelStopMin} min fuel` : ""}</div>
+                  <div className="total-breakdown">Transit + {bedsideTotal} min bedside{activeResult.fuelStop ? ` + ${cfg.fuelStopMin} min fuel` : ""}</div>
                 </div>
               </div>
 
@@ -1841,19 +1841,19 @@ export default function App() {
                 <div className="leg">
                   <div className="leg-connector">
                     <div className="leg-dot dim" />
-                    {isRodman && <div className="leg-line" />}
+                    {restockActive && <div className="leg-line" />}
                   </div>
                   <div className="leg-content">
                     <div className="leg-text">
                       <div className="leg-route">{result.legs[2].label}</div>
                       <div className="leg-meta">{result.legs[2].miles} mi · {result.legs[2].gs ? `${result.legs[2].gs} kts GS` : legMeta}</div>
-                      {isRodman && <div className="restock-badge">⟳ Restock at CMMC</div>}
+                      {restockActive && <div className="restock-badge">⟳ Restock at CMMC</div>}
                     </div>
                     <div className="leg-time">{formatTime(result.legs[2].time)}</div>
                   </div>
                 </div>
 
-                {isRodman && result.legs[3] && (
+                {restockActive && result.legs[3] && (
                   <div className="leg">
                     <div className="leg-connector">
                       <div className="leg-dot green" />

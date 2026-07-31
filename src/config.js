@@ -11,7 +11,6 @@ export const DEFAULT_CONFIG = {
   fwLiftMin: 30,
   fwOpsMin: 10,
   // Stop times
-  cmmcStopMin: 15,
   fuelStopMin: 12,
   // Bedside presets
   bedsidePresets: [
